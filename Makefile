@@ -57,8 +57,24 @@ test-coverage: test ## Run tests and generate coverage report
 .PHONY: test-integration
 test-integration: ## Run integration tests
 	@echo "Running integration tests..."
-	@go test -v -tags=integration ./test/integration/...
+	@echo "Note: Requires PostgreSQL with migrations applied"
+	@echo "Use 'make test-db-setup' first if not already done"
+	@TEST_DB_URL="$(DB_URL)" go test -v ./test/integration/...
 	@echo "✓ Integration tests completed"
+
+.PHONY: test-db-setup
+test-db-setup: ## Setup test database with migrations
+	@echo "Setting up test database..."
+	@docker exec cqar-postgres psql -U cqar -c "DROP DATABASE IF EXISTS cqar_test;" 2>/dev/null || true
+	@docker exec cqar-postgres psql -U cqar -c "CREATE DATABASE cqar_test;"
+	@migrate -path $(MIGRATE_DIR) -database "postgres://cqar:cqar_dev_password@localhost:5432/cqar_test?sslmode=disable" up
+	@echo "✓ Test database ready"
+
+.PHONY: test-db-teardown
+test-db-teardown: ## Teardown test database
+	@echo "Tearing down test database..."
+	@docker exec cqar-postgres psql -U cqar -c "DROP DATABASE IF EXISTS cqar_test;"
+	@echo "✓ Test database removed"
 
 .PHONY: clean
 clean: ## Remove build artifacts and generated files

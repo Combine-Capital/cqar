@@ -2,7 +2,7 @@
 
 ## Progress Checklist
 - [x] **Commit 1**: Project Foundation & Configuration
-- [ ] **Commit 2**: Database Schema & Migrations (Core Tables)
+- [x] **Commit 2**: Database Schema & Migrations (Core Tables)
 - [ ] **Commit 3**: Database Schema & Migrations (Relationship Tables)
 - [ ] **Commit 4**: Repository Layer - Asset Domain
 - [ ] **Commit 5**: Repository Layer - Symbol & Chain Domain

@@ -1,213 +1,196 @@
-# CQAR - Crypto Quant Asset Registry
+[![GitHub Workflow Status (branch)](https://img.shields.io/github/actions/workflow/status/golang-migrate/migrate/ci.yaml?branch=master)](https://github.com/golang-migrate/migrate/actions/workflows/ci.yaml?query=branch%3Amaster)
+[![GoDoc](https://pkg.go.dev/badge/github.com/golang-migrate/migrate)](https://pkg.go.dev/github.com/golang-migrate/migrate/v4)
+[![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
+[![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
+[![Docker Pulls](https://img.shields.io/docker/pulls/migrate/migrate.svg)](https://hub.docker.com/r/migrate/migrate/)
+![Supported Go Versions](https://img.shields.io/badge/Go-1.20%2C%201.21-lightgrey.svg)
+[![GitHub Release](https://img.shields.io/github/release/golang-migrate/migrate.svg)](https://github.com/golang-migrate/migrate/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/golang-migrate/migrate/v4)](https://goreportcard.com/report/github.com/golang-migrate/migrate/v4)
 
-Part of the **Crypto Quant Platform** - Professional-grade crypto trading infrastructure.
+# migrate
 
-## Overview
+__Database migrations written in Go. Use as [CLI](#cli-usage) or import as [library](#use-in-your-go-project).__
 
-CQAR is a gRPC microservice that provides canonical reference data for the Crypto Quant trading platform. It acts as the single source of truth for:
+* Migrate reads migrations from [sources](#migration-sources)
+   and applies them in correct order to a [database](#databases).
+* Drivers are "dumb", migrate glues everything together and makes sure the logic is bulletproof.
+   (Keeps the drivers lightweight, too.)
+* Database drivers don't assume things or try to correct user input. When in doubt, fail.
 
-- **Assets**: Individual tokens and coins (BTC, ETH, USDT, WETH) with multi-chain deployments
-- **Symbols**: Trading pairs and markets (BTC/USDT spot, ETH-PERP, options)
-- **Chains**: Blockchain networks (Ethereum, Polygon, Arbitrum)
-- **Venues**: Exchanges and protocols (Binance, Uniswap V3, dYdX)
-- **Mappings**: Asset/symbol availability per venue, cross-chain relationships
+Forked from [mattes/migrate](https://github.com/mattes/migrate)
 
-### Key Features
+## Databases
 
-- **Domain Separation**: Clear boundaries between Assets, Symbols, and Venues
-- **Symbol Resolution**: Fast lookups (<10ms p50) for trading pair identification
-- **Multi-Chain Support**: Track token deployments across multiple blockchains
-- **Relationship Graph**: Map wrapped tokens, staking derivatives, and bridges
-- **Quality Flags**: Track scams, exploits, and deprecated assets with severity levels
-- **Event Publishing**: Lifecycle events via NATS JetStream for downstream services
+Database drivers run migrations. [Add a new database?](database/driver.go)
 
-## Architecture
+* [PostgreSQL](database/postgres)
+* [PGX v4](database/pgx)
+* [PGX v5](database/pgx/v5)
+* [Redshift](database/redshift)
+* [Ql](database/ql)
+* [Cassandra / ScyllaDB](database/cassandra)
+* [SQLite](database/sqlite)
+* [SQLite3](database/sqlite3) ([todo #165](https://github.com/mattes/migrate/issues/165))
+* [SQLCipher](database/sqlcipher)
+* [MySQL / MariaDB](database/mysql)
+* [Neo4j](database/neo4j)
+* [MongoDB](database/mongodb)
+* [CrateDB](database/crate) ([todo #170](https://github.com/mattes/migrate/issues/170))
+* [Shell](database/shell) ([todo #171](https://github.com/mattes/migrate/issues/171))
+* [Google Cloud Spanner](database/spanner)
+* [CockroachDB](database/cockroachdb)
+* [YugabyteDB](database/yugabytedb)
+* [ClickHouse](database/clickhouse)
+* [Firebird](database/firebird)
+* [MS SQL Server](database/sqlserver)
+* [RQLite](database/rqlite)
 
-CQAR is built on the CQ platform infrastructure:
+### Database URLs
 
-- **CQC**: Protocol Buffer definitions for all data types and gRPC interfaces
-- **CQI**: Infrastructure packages (logging, metrics, tracing, config, database, cache, event bus)
-- **PostgreSQL**: Primary data store with JSONB for flexible metadata
-- **Redis**: Cache layer for sub-10ms read performance
-- **NATS JetStream**: Event bus for publishing domain events
+Database connection strings are specified via URLs. The URL format is driver dependent but generally has the form: `dbdriver://username:password@host:port/dbname?param1=true&param2=false`
 
-## Repository Structure
+Any [reserved URL characters](https://en.wikipedia.org/wiki/Percent-encoding#Percent-encoding_reserved_characters) need to be escaped. Note, the `%` character also [needs to be escaped](https://en.wikipedia.org/wiki/Percent-encoding#Percent-encoding_the_percent_character)
 
-```
-cqar/
-├── cmd/
-│   └── server/         # Main application entry point
-├── internal/
-│   ├── config/         # Configuration (extends CQI config)
-│   ├── manager/        # Business logic layer (to be implemented)
-│   ├── repository/     # Data access layer (to be implemented)
-│   └── server/         # gRPC server implementation (to be implemented)
-├── migrations/         # Database schema migrations (to be implemented)
-├── test/              # Integration tests (to be implemented)
-├── docs/              # Documentation
-│   ├── BRIEF.md       # Project requirements
-│   ├── SPEC.md        # Technical specification
-│   └── ROADMAP.md     # Implementation roadmap
-├── config.yaml        # Base configuration
-├── config.dev.yaml    # Development overrides
-├── config.prod.yaml   # Production overrides
-└── Makefile           # Build automation
-```
+Explicitly, the following characters need to be escaped:
+`!`, `#`, `$`, `%`, `&`, `'`, `(`, `)`, `*`, `+`, `,`, `/`, `:`, `;`, `=`, `?`, `@`, `[`, `]`
 
-## Getting Started
-
-### Prerequisites
-
-- Go 1.21 or higher
-- PostgreSQL 14+
-- Redis 7+
-- NATS JetStream 2.10+
-- [golang-migrate](https://github.com/golang-migrate/migrate) for database migrations
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/Combine-Capital/cqar.git
-cd cqar
-```
-
-2. Install dependencies:
-```bash
-make deps
-```
-
-3. Set up configuration:
-```bash
-# Copy and edit configuration
-cp config.yaml config.local.yaml
-# Edit config.local.yaml with your database, cache, and event bus settings
-```
-
-4. Run database migrations (once migrations are implemented):
-```bash
-make migrate-up
-```
-
-5. Build the service:
-```bash
-make build
-```
-
-### Running Locally
+It's easiest to always run the URL parts of your DB connection URL (e.g. username, password, etc) through an URL encoder. See the example Python snippets below:
 
 ```bash
-# Run from source
-make run
-
-# Or run the compiled binary
-./bin/cqar --config config.yaml
-
-# Show help
-./bin/cqar --help
-
-# Show version
-./bin/cqar --version
+$ python3 -c 'import urllib.parse; print(urllib.parse.quote(input("String to encode: "), ""))'
+String to encode: FAKEpassword!#$%&'()*+,/:;=?@[]
+FAKEpassword%21%23%24%25%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D
+$ python2 -c 'import urllib; print urllib.quote(raw_input("String to encode: "), "")'
+String to encode: FAKEpassword!#$%&'()*+,/:;=?@[]
+FAKEpassword%21%23%24%25%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D
+$
 ```
 
-### Configuration
+## Migration Sources
 
-CQAR uses CQI's configuration management with YAML files and environment variable overrides:
+Source drivers read migrations from local or remote sources. [Add a new source?](source/driver.go)
 
-```yaml
-service:
-  name: "cqar"
-  version: "0.1.0"
-  env: "development"
+* [Filesystem](source/file) - read from filesystem
+* [io/fs](source/iofs) - read from a Go [io/fs](https://pkg.go.dev/io/fs#FS)
+* [Go-Bindata](source/go_bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
+* [pkger](source/pkger) - read from embedded binary data ([markbates/pkger](https://github.com/markbates/pkger))
+* [GitHub](source/github) - read from remote GitHub repositories
+* [GitHub Enterprise](source/github_ee) - read from remote GitHub Enterprise repositories
+* [Bitbucket](source/bitbucket) - read from remote Bitbucket repositories
+* [Gitlab](source/gitlab) - read from remote Gitlab repositories
+* [AWS S3](source/aws_s3) - read from Amazon Web Services S3
+* [Google Cloud Storage](source/google_cloud_storage) - read from Google Cloud Platform Storage
 
-server:
-  http_port: 8080
-  grpc_port: 9090
+## CLI usage
 
-database:
-  host: "localhost"
-  port: 5432
-  database: "cqar"
-  user: "cqar"
-  password: "your_password"
+* Simple wrapper around this library.
+* Handles ctrl+c (SIGINT) gracefully.
+* No config search paths, no config files, no magic ENV var injections.
 
-cache:
-  host: "localhost"
-  port: 6379
+__[CLI Documentation](cmd/migrate)__
 
-eventbus:
-  backend: "jetstream"
-  servers:
-    - "nats://localhost:4222"
-```
-
-Environment variables use the `CQAR_` prefix:
-- `CQAR_DATABASE_HOST`
-- `CQAR_DATABASE_PASSWORD`
-- `CQAR_CACHE_HOST`
-- etc.
-
-### Development Commands
+### Basic usage
 
 ```bash
-# Format code
-make fmt
-
-# Run linters
-make lint
-
-# Run tests
-make test
-
-# Generate coverage report
-make test-coverage
-
-# Run integration tests
-make test-integration
-
-# Clean build artifacts
-make clean
-
-# See all available commands
-make help
+$ migrate -source file://path/to/migrations -database postgres://localhost:5432/database up 2
 ```
 
-## API
+### Docker usage
 
-CQAR implements the `AssetRegistry` gRPC service defined in [CQC](https://github.com/Combine-Capital/cqc). See the CQC repository for complete protobuf definitions.
+```bash
+$ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate
+    -path=/migrations/ -database postgres://localhost:5432/database up 2
+```
 
-### Example: Resolve Venue Symbol
+## Use in your Go project
+
+* API is stable and frozen for this release (v3 & v4).
+* Uses [Go modules](https://golang.org/cmd/go/#hdr-Modules__module_versions__and_more) to manage dependencies.
+* To help prevent database corruptions, it supports graceful stops via `GracefulStop chan bool`.
+* Bring your own logger.
+* Uses `io.Reader` streams internally for low memory overhead.
+* Thread-safe and no goroutine leaks.
+
+__[Go Documentation](https://pkg.go.dev/github.com/golang-migrate/migrate/v4)__
 
 ```go
 import (
-    servicespb "github.com/Combine-Capital/cqc/gen/go/cqc/services/v1"
+    "github.com/golang-migrate/migrate/v4"
+    _ "github.com/golang-migrate/migrate/v4/database/postgres"
+    _ "github.com/golang-migrate/migrate/v4/source/github"
 )
 
-// Get symbol for Binance's "BTCUSDT" market
-resp, err := client.GetVenueSymbol(ctx, &servicespb.GetVenueSymbolRequest{
-    VenueId:     "binance",
-    VenueSymbol: "BTCUSDT",
-})
-
-// Response includes:
-// - Canonical symbol ID
-// - Base asset (BTC) and quote asset (USDT) IDs
-// - Market specs (tick_size, lot_size, etc.)
-// - Venue-specific fees
+func main() {
+    m, err := migrate.New(
+        "github://mattes:personal-access-token@mattes/migrate_test",
+        "postgres://localhost:5432/database?sslmode=enable")
+    m.Steps(2)
+}
 ```
 
-## Project Status
+Want to use an existing database client?
 
-**Current Phase**: Commit 1 - Project Foundation & Configuration ✅
+```go
+import (
+    "database/sql"
+    _ "github.com/lib/pq"
+    "github.com/golang-migrate/migrate/v4"
+    "github.com/golang-migrate/migrate/v4/database/postgres"
+    _ "github.com/golang-migrate/migrate/v4/source/file"
+)
 
-See [ROADMAP.md](docs/ROADMAP.md) for the complete implementation plan.
+func main() {
+    db, err := sql.Open("postgres", "postgres://localhost:5432/database?sslmode=enable")
+    driver, err := postgres.WithInstance(db, &postgres.Config{})
+    m, err := migrate.NewWithDatabaseInstance(
+        "file:///migrations",
+        "postgres", driver)
+    m.Up() // or m.Step(2) if you want to explicitly set the number of migrations to run
+}
+```
 
-## Related Services
+## Getting started
 
-- [CQ Hub](https://github.com/Combine-Capital/cqhub) - Platform Documentation
-- [CQC](https://github.com/Combine-Capital/cqc) - Platform Contracts (Protobuf Definitions)
-- [CQI](https://github.com/Combine-Capital/cqi) - Platform Infrastructure (Shared Libraries)
+Go to [getting started](GETTING_STARTED.md)
 
-## License
+## Tutorials
 
-Proprietary - Combine Capital
+* [CockroachDB](database/cockroachdb/TUTORIAL.md)
+* [PostgreSQL](database/postgres/TUTORIAL.md)
+
+(more tutorials to come)
+
+## Migration files
+
+Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-files-up-and-down-for-a-migration)
+
+```bash
+1481574547_create_users_table.up.sql
+1481574547_create_users_table.down.sql
+```
+
+[Best practices: How to write migrations.](MIGRATIONS.md)
+
+## Coming from another db migration tool?
+
+Check out [migradaptor](https://github.com/musinit/migradaptor/).
+*Note: migradaptor is not affliated or supported by this project*
+
+## Versions
+
+Version | Supported? | Import | Notes
+--------|------------|--------|------
+**master** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | New features and bug fixes arrive here first |
+**v4** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | Used for stable releases |
+**v3** | :x: | `import "github.com/golang-migrate/migrate"` (with package manager) or `import "gopkg.in/golang-migrate/migrate.v3"` (not recommended) | **DO NOT USE** - No longer supported |
+
+## Development and Contributing
+
+Yes, please! [`Makefile`](Makefile) is your friend,
+read the [development guide](CONTRIBUTING.md).
+
+Also have a look at the [FAQ](FAQ.md).
+
+---
+
+Looking for alternatives? [https://awesome-go.com/#database](https://awesome-go.com/#database).
