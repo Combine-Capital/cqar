@@ -1,0 +1,37 @@
+# CQAR Production Configuration
+# Overrides base config for production deployment
+
+service:
+  env: "production"
+
+server:
+  shutdown_timeout: "60s"
+
+database:
+  host: "${CQAR_DATABASE_HOST}"
+  user: "${CQAR_DATABASE_USER}"
+  password: "${CQAR_DATABASE_PASSWORD}"
+  ssl_mode: "require"
+  max_conns: 100
+  min_idle_conns: 25
+  max_conn_lifetime: "30m"
+
+cache:
+  host: "${CQAR_CACHE_HOST}"
+  password: "${CQAR_CACHE_PASSWORD}"
+  max_retries: 5
+  pool_size: 50
+
+eventbus:
+  servers:
+    - "${CQAR_EVENT_BUS_URL}"
+  consumer_name: "cqar-${HOSTNAME}"
+
+log:
+  level: "info"
+  format: "json"
+
+tracing:
+  enabled: true
+  endpoint: "${CQAR_TRACING_ENDPOINT}"
+  sample_rate: 0.1  # Sample 10% of traces in production

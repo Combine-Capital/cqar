@@ -1,0 +1,17 @@
+# CQAR Development Configuration
+# Overrides base config for local development
+
+service:
+  env: "development"
+
+database:
+  database: "cqar_dev"
+
+log:
+  level: "debug"
+  format: "console"
+
+tracing:
+  enabled: true
+  endpoint: "localhost:4317"
+  sample_rate: 1.0  # Sample all traces in development
