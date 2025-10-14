@@ -501,3 +501,883 @@ func TestMigrations_VenuesTable(t *testing.T) {
 		assert.Equal(t, chainID, chain.String)
 	})
 }
+
+func TestMigrations_DeploymentsTable(t *testing.T) {
+	db := getTestDB(t)
+	defer db.Close()
+
+	// Setup: Create test asset and chain
+	assetID := uuid.New()
+	chainID := "test_deploy_chain"
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	_, err := db.Exec(`
+		INSERT INTO assets (id, symbol, name, type, created_at, updated_at)
+		VALUES ($1, 'USDC', 'USD Coin', 'STABLECOIN', $2, $2)
+	`, assetID, now)
+	require.NoError(t, err)
+	defer db.Exec(`DELETE FROM assets WHERE id = $1`, assetID)
+
+	_, err = db.Exec(`
+		INSERT INTO chains (id, name, chain_type, created_at)
+		VALUES ($1, 'Test Deploy Chain', 'EVM', $2)
+	`, chainID, now)
+	require.NoError(t, err)
+	defer db.Exec(`DELETE FROM chains WHERE id = $1`, chainID)
+
+	t.Run("table exists", func(t *testing.T) {
+		var exists bool
+		err := db.QueryRow(`
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables 
+				WHERE table_schema = 'public' 
+				AND table_name = 'deployments'
+			)
+		`).Scan(&exists)
+		require.NoError(t, err)
+		assert.True(t, exists, "deployments table should exist")
+	})
+
+	t.Run("has required indexes", func(t *testing.T) {
+		expectedIndexes := []string{
+			"idx_deployments_asset_id",
+			"idx_deployments_chain_id",
+			"idx_deployments_canonical",
+			"idx_deployments_asset_chain",
+			"idx_deployments_contract_address",
+		}
+
+		for _, indexName := range expectedIndexes {
+			var exists bool
+			err := db.QueryRow(`
+				SELECT EXISTS (
+					SELECT FROM pg_indexes
+					WHERE schemaname = 'public'
+					AND tablename = 'deployments'
+					AND indexname = $1
+				)
+			`, indexName).Scan(&exists)
+			require.NoError(t, err)
+			assert.True(t, exists, "Index %s should exist", indexName)
+		}
+	})
+
+	t.Run("enforces foreign key constraints", func(t *testing.T) {
+		deploymentID := uuid.New()
+		invalidAssetID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, created_at, updated_at)
+			VALUES ($1, $2, $3, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, $4, $4)
+		`, deploymentID, invalidAssetID, chainID, now)
+
+		assert.Error(t, err, "Should fail with invalid asset_id")
+		assert.Contains(t, err.Error(), "foreign key constraint", "Error should mention foreign key constraint")
+	})
+
+	t.Run("enforces unique asset+chain constraint", func(t *testing.T) {
+		deploymentID1 := uuid.New()
+		deploymentID2 := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, created_at, updated_at)
+			VALUES ($1, $2, $3, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, $4, $4)
+		`, deploymentID1, assetID, chainID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM deployments WHERE id = $1`, deploymentID1)
+
+		// Try to insert duplicate asset+chain
+		_, err = db.Exec(`
+			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, created_at, updated_at)
+			VALUES ($1, $2, $3, '0xdifferentaddress', 6, $4, $4)
+		`, deploymentID2, assetID, chainID, now)
+		assert.Error(t, err, "Should fail with duplicate asset+chain")
+		assert.Contains(t, err.Error(), "unique_asset_chain_deployment", "Error should mention unique constraint")
+	})
+
+	t.Run("enforces decimals range constraint", func(t *testing.T) {
+		deploymentID := uuid.New()
+		chainID2 := "test_chain2"
+
+		_, err := db.Exec(`INSERT INTO chains (id, name, chain_type, created_at) VALUES ($1, 'Test Chain 2', 'EVM', $2)`, chainID2, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM chains WHERE id = $1`, chainID2)
+
+		_, err = db.Exec(`
+			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, created_at, updated_at)
+			VALUES ($1, $2, $3, '0xtest', 100, $4, $4)
+		`, deploymentID, assetID, chainID2, now)
+		assert.Error(t, err, "Should fail with decimals > 77")
+		assert.Contains(t, err.Error(), "chk_decimals_range", "Error should mention decimals constraint")
+	})
+
+	t.Run("can insert and query deployment", func(t *testing.T) {
+		deploymentID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, is_canonical, created_at, updated_at)
+			VALUES ($1, $2, $3, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, true, $4, $4)
+		`, deploymentID, assetID, chainID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM deployments WHERE id = $1`, deploymentID)
+
+		var contractAddress string
+		var decimals int
+		var isCanonical bool
+		err = db.QueryRow(`SELECT contract_address, decimals, is_canonical FROM deployments WHERE id = $1`, deploymentID).
+			Scan(&contractAddress, &decimals, &isCanonical)
+		require.NoError(t, err)
+		assert.Equal(t, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", contractAddress)
+		assert.Equal(t, 6, decimals)
+		assert.True(t, isCanonical)
+	})
+}
+
+func TestMigrations_RelationshipsTable(t *testing.T) {
+	db := getTestDB(t)
+	defer db.Close()
+
+	// Setup: Create test assets
+	ethID := uuid.New()
+	wethID := uuid.New()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	_, err := db.Exec(`
+		INSERT INTO assets (id, symbol, name, type, created_at, updated_at)
+		VALUES 
+			($1, 'ETH', 'Ethereum', 'CRYPTOCURRENCY', $3, $3),
+			($2, 'WETH', 'Wrapped ETH', 'WRAPPED', $3, $3)
+	`, ethID, wethID, now)
+	require.NoError(t, err)
+	defer func() {
+		db.Exec(`DELETE FROM relationships WHERE from_asset_id IN ($1, $2) OR to_asset_id IN ($1, $2)`, ethID, wethID)
+		db.Exec(`DELETE FROM assets WHERE id IN ($1, $2)`, ethID, wethID)
+	}()
+
+	t.Run("table exists", func(t *testing.T) {
+		var exists bool
+		err := db.QueryRow(`
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables 
+				WHERE table_schema = 'public' 
+				AND table_name = 'relationships'
+			)
+		`).Scan(&exists)
+		require.NoError(t, err)
+		assert.True(t, exists, "relationships table should exist")
+	})
+
+	t.Run("has required indexes", func(t *testing.T) {
+		expectedIndexes := []string{
+			"idx_relationships_from_asset",
+			"idx_relationships_to_asset",
+			"idx_relationships_type",
+			"idx_relationships_bidirectional",
+		}
+
+		for _, indexName := range expectedIndexes {
+			var exists bool
+			err := db.QueryRow(`
+				SELECT EXISTS (
+					SELECT FROM pg_indexes
+					WHERE schemaname = 'public'
+					AND tablename = 'relationships'
+					AND indexname = $1
+				)
+			`, indexName).Scan(&exists)
+			require.NoError(t, err)
+			assert.True(t, exists, "Index %s should exist", indexName)
+		}
+	})
+
+	t.Run("enforces relationship_type enum", func(t *testing.T) {
+		relationshipID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO relationships (id, from_asset_id, to_asset_id, relationship_type, created_at, updated_at)
+			VALUES ($1, $2, $3, 'INVALID_TYPE', $4, $4)
+		`, relationshipID, wethID, ethID, now)
+		assert.Error(t, err, "Should fail with invalid relationship_type")
+		assert.Contains(t, err.Error(), "chk_relationship_type", "Error should mention relationship_type constraint")
+	})
+
+	t.Run("prevents self-referential relationships", func(t *testing.T) {
+		relationshipID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO relationships (id, from_asset_id, to_asset_id, relationship_type, created_at, updated_at)
+			VALUES ($1, $2, $2, 'WRAPS', $3, $3)
+		`, relationshipID, ethID, now)
+		assert.Error(t, err, "Should fail with self-referential relationship")
+		assert.Contains(t, err.Error(), "chk_no_self_reference", "Error should mention self-reference constraint")
+	})
+
+	t.Run("can insert and query relationship", func(t *testing.T) {
+		relationshipID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO relationships (id, from_asset_id, to_asset_id, relationship_type, conversion_rate, protocol, created_at, updated_at)
+			VALUES ($1, $2, $3, 'WRAPS', 1.0, 'WETH9', $4, $4)
+		`, relationshipID, wethID, ethID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM relationships WHERE id = $1`, relationshipID)
+
+		var relType, protocol string
+		var conversionRate float64
+		err = db.QueryRow(`SELECT relationship_type, conversion_rate, protocol FROM relationships WHERE id = $1`, relationshipID).
+			Scan(&relType, &conversionRate, &protocol)
+		require.NoError(t, err)
+		assert.Equal(t, "WRAPS", relType)
+		assert.Equal(t, 1.0, conversionRate)
+		assert.Equal(t, "WETH9", protocol)
+	})
+}
+
+func TestMigrations_QualityFlagsTable(t *testing.T) {
+	db := getTestDB(t)
+	defer db.Close()
+
+	// Setup: Create test asset
+	assetID := uuid.New()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	_, err := db.Exec(`
+		INSERT INTO assets (id, symbol, name, type, created_at, updated_at)
+		VALUES ($1, 'SCAM', 'Scam Token', 'CRYPTOCURRENCY', $2, $2)
+	`, assetID, now)
+	require.NoError(t, err)
+	defer func() {
+		db.Exec(`DELETE FROM quality_flags WHERE asset_id = $1`, assetID)
+		db.Exec(`DELETE FROM assets WHERE id = $1`, assetID)
+	}()
+
+	t.Run("table exists", func(t *testing.T) {
+		var exists bool
+		err := db.QueryRow(`
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables 
+				WHERE table_schema = 'public' 
+				AND table_name = 'quality_flags'
+			)
+		`).Scan(&exists)
+		require.NoError(t, err)
+		assert.True(t, exists, "quality_flags table should exist")
+	})
+
+	t.Run("has required indexes", func(t *testing.T) {
+		expectedIndexes := []string{
+			"idx_quality_flags_asset_id",
+			"idx_quality_flags_type",
+			"idx_quality_flags_severity",
+			"idx_quality_flags_active_critical",
+			"idx_quality_flags_active",
+		}
+
+		for _, indexName := range expectedIndexes {
+			var exists bool
+			err := db.QueryRow(`
+				SELECT EXISTS (
+					SELECT FROM pg_indexes
+					WHERE schemaname = 'public'
+					AND tablename = 'quality_flags'
+					AND indexname = $1
+				)
+			`, indexName).Scan(&exists)
+			require.NoError(t, err)
+			assert.True(t, exists, "Index %s should exist", indexName)
+		}
+	})
+
+	t.Run("enforces flag_type enum", func(t *testing.T) {
+		flagID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO quality_flags (id, asset_id, flag_type, severity, source, reason, raised_at)
+			VALUES ($1, $2, 'INVALID_TYPE', 'CRITICAL', 'manual', 'test', $3)
+		`, flagID, assetID, now)
+		assert.Error(t, err, "Should fail with invalid flag_type")
+		assert.Contains(t, err.Error(), "chk_flag_type", "Error should mention flag_type constraint")
+	})
+
+	t.Run("enforces severity enum", func(t *testing.T) {
+		flagID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO quality_flags (id, asset_id, flag_type, severity, source, reason, raised_at)
+			VALUES ($1, $2, 'SCAM', 'INVALID_SEVERITY', 'manual', 'test', $3)
+		`, flagID, assetID, now)
+		assert.Error(t, err, "Should fail with invalid severity")
+		assert.Contains(t, err.Error(), "chk_severity", "Error should mention severity constraint")
+	})
+
+	t.Run("can insert and query quality flag", func(t *testing.T) {
+		flagID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO quality_flags (id, asset_id, flag_type, severity, source, reason, evidence_url, raised_at)
+			VALUES ($1, $2, 'SCAM', 'CRITICAL', 'automated_scanner', 'Contract has rug pull indicators', 'https://example.com/evidence', $3)
+		`, flagID, assetID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM quality_flags WHERE id = $1`, flagID)
+
+		var flagType, severity, source, reason string
+		err = db.QueryRow(`SELECT flag_type, severity, source, reason FROM quality_flags WHERE id = $1`, flagID).
+			Scan(&flagType, &severity, &source, &reason)
+		require.NoError(t, err)
+		assert.Equal(t, "SCAM", flagType)
+		assert.Equal(t, "CRITICAL", severity)
+		assert.Equal(t, "automated_scanner", source)
+		assert.Equal(t, "Contract has rug pull indicators", reason)
+	})
+
+	t.Run("can resolve quality flag", func(t *testing.T) {
+		flagID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO quality_flags (id, asset_id, flag_type, severity, source, reason, raised_at)
+			VALUES ($1, $2, 'SUSPICIOUS', 'WARNING', 'manual', 'Unusual trading pattern', $3)
+		`, flagID, assetID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM quality_flags WHERE id = $1`, flagID)
+
+		resolvedAt := now.Add(24 * time.Hour)
+		_, err = db.Exec(`
+			UPDATE quality_flags 
+			SET resolved_at = $1, resolved_by = $2, resolution_notes = $3
+			WHERE id = $4
+		`, resolvedAt, "admin", "False alarm - trading pattern was legitimate", flagID)
+		require.NoError(t, err)
+
+		var resolved sql.NullTime
+		var resolvedBy, resolutionNotes sql.NullString
+		err = db.QueryRow(`SELECT resolved_at, resolved_by, resolution_notes FROM quality_flags WHERE id = $1`, flagID).
+			Scan(&resolved, &resolvedBy, &resolutionNotes)
+		require.NoError(t, err)
+		assert.True(t, resolved.Valid)
+		assert.True(t, resolvedBy.Valid)
+		assert.Equal(t, "admin", resolvedBy.String)
+		assert.True(t, resolutionNotes.Valid)
+	})
+}
+
+func TestMigrations_AssetGroupsTable(t *testing.T) {
+	db := getTestDB(t)
+	defer db.Close()
+
+	// Setup: Create test assets
+	ethID := uuid.New()
+	wethID := uuid.New()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	_, err := db.Exec(`
+		INSERT INTO assets (id, symbol, name, type, created_at, updated_at)
+		VALUES 
+			($1, 'ETH', 'Ethereum', 'CRYPTOCURRENCY', $3, $3),
+			($2, 'WETH', 'Wrapped ETH', 'WRAPPED', $3, $3)
+	`, ethID, wethID, now)
+	require.NoError(t, err)
+	defer db.Exec(`DELETE FROM assets WHERE id IN ($1, $2)`, ethID, wethID)
+
+	t.Run("tables exist", func(t *testing.T) {
+		for _, tableName := range []string{"asset_groups", "group_members"} {
+			var exists bool
+			err := db.QueryRow(`
+				SELECT EXISTS (
+					SELECT FROM information_schema.tables 
+					WHERE table_schema = 'public' 
+					AND table_name = $1
+				)
+			`, tableName).Scan(&exists)
+			require.NoError(t, err)
+			assert.True(t, exists, "%s table should exist", tableName)
+		}
+	})
+
+	t.Run("enforces group name format", func(t *testing.T) {
+		groupID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO asset_groups (id, name, created_at, updated_at)
+			VALUES ($1, 'Invalid Group Name', $2, $2)
+		`, groupID, now)
+		assert.Error(t, err, "Should fail with invalid group name format")
+		assert.Contains(t, err.Error(), "chk_group_name_format", "Error should mention name format constraint")
+	})
+
+	t.Run("can create group and add members", func(t *testing.T) {
+		groupID := uuid.New()
+		memberID1 := uuid.New()
+		memberID2 := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO asset_groups (id, name, description, created_at, updated_at)
+			VALUES ($1, 'all_eth_variants', 'All ETH and ETH derivatives', $2, $2)
+		`, groupID, now)
+		require.NoError(t, err)
+		defer func() {
+			db.Exec(`DELETE FROM group_members WHERE group_id = $1`, groupID)
+			db.Exec(`DELETE FROM asset_groups WHERE id = $1`, groupID)
+		}()
+
+		_, err = db.Exec(`
+			INSERT INTO group_members (id, group_id, asset_id, weight, added_at)
+			VALUES 
+				($1, $2, $3, 1.0, $5),
+				($4, $2, $6, 1.0, $5)
+		`, memberID1, groupID, ethID, memberID2, now, wethID)
+		require.NoError(t, err)
+
+		var count int
+		err = db.QueryRow(`SELECT COUNT(*) FROM group_members WHERE group_id = $1`, groupID).Scan(&count)
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+	})
+
+	t.Run("enforces unique group+asset constraint", func(t *testing.T) {
+		groupID := uuid.New()
+		memberID1 := uuid.New()
+		memberID2 := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO asset_groups (id, name, created_at, updated_at)
+			VALUES ($1, 'test_group', $2, $2)
+		`, groupID, now)
+		require.NoError(t, err)
+		defer func() {
+			db.Exec(`DELETE FROM group_members WHERE group_id = $1`, groupID)
+			db.Exec(`DELETE FROM asset_groups WHERE id = $1`, groupID)
+		}()
+
+		_, err = db.Exec(`
+			INSERT INTO group_members (id, group_id, asset_id, added_at)
+			VALUES ($1, $2, $3, $4)
+		`, memberID1, groupID, ethID, now)
+		require.NoError(t, err)
+
+		// Try to add same asset to same group again
+		_, err = db.Exec(`
+			INSERT INTO group_members (id, group_id, asset_id, added_at)
+			VALUES ($1, $2, $3, $4)
+		`, memberID2, groupID, ethID, now)
+		assert.Error(t, err, "Should fail with duplicate group+asset")
+		assert.Contains(t, err.Error(), "unique_group_asset", "Error should mention unique constraint")
+	})
+}
+
+func TestMigrations_AssetIdentifiersTable(t *testing.T) {
+	db := getTestDB(t)
+	defer db.Close()
+
+	// Setup: Create test asset
+	assetID := uuid.New()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	_, err := db.Exec(`
+		INSERT INTO assets (id, symbol, name, type, created_at, updated_at)
+		VALUES ($1, 'BTC', 'Bitcoin', 'CRYPTOCURRENCY', $2, $2)
+	`, assetID, now)
+	require.NoError(t, err)
+	defer func() {
+		db.Exec(`DELETE FROM asset_identifiers WHERE asset_id = $1`, assetID)
+		db.Exec(`DELETE FROM assets WHERE id = $1`, assetID)
+	}()
+
+	t.Run("table exists", func(t *testing.T) {
+		var exists bool
+		err := db.QueryRow(`
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables 
+				WHERE table_schema = 'public' 
+				AND table_name = 'asset_identifiers'
+			)
+		`).Scan(&exists)
+		require.NoError(t, err)
+		assert.True(t, exists, "asset_identifiers table should exist")
+	})
+
+	t.Run("has required indexes including GIN", func(t *testing.T) {
+		expectedIndexes := []string{
+			"idx_asset_identifiers_asset_id",
+			"idx_asset_identifiers_source",
+			"idx_asset_identifiers_external_id",
+			"idx_asset_identifiers_source_external",
+			"idx_asset_identifiers_metadata",
+		}
+
+		for _, indexName := range expectedIndexes {
+			var exists bool
+			err := db.QueryRow(`
+				SELECT EXISTS (
+					SELECT FROM pg_indexes
+					WHERE schemaname = 'public'
+					AND tablename = 'asset_identifiers'
+					AND indexname = $1
+				)
+			`, indexName).Scan(&exists)
+			require.NoError(t, err)
+			assert.True(t, exists, "Index %s should exist", indexName)
+		}
+	})
+
+	t.Run("can insert and query asset identifier", func(t *testing.T) {
+		identifierID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO asset_identifiers (id, asset_id, source, external_id, is_primary, created_at, updated_at)
+			VALUES ($1, $2, 'coingecko', 'bitcoin', true, $3, $3)
+		`, identifierID, assetID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM asset_identifiers WHERE id = $1`, identifierID)
+
+		var source, externalID string
+		var isPrimary bool
+		err = db.QueryRow(`SELECT source, external_id, is_primary FROM asset_identifiers WHERE id = $1`, identifierID).
+			Scan(&source, &externalID, &isPrimary)
+		require.NoError(t, err)
+		assert.Equal(t, "coingecko", source)
+		assert.Equal(t, "bitcoin", externalID)
+		assert.True(t, isPrimary)
+	})
+
+	t.Run("enforces unique asset+source constraint", func(t *testing.T) {
+		identifierID1 := uuid.New()
+		identifierID2 := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO asset_identifiers (id, asset_id, source, external_id, created_at, updated_at)
+			VALUES ($1, $2, 'coingecko', 'bitcoin', $3, $3)
+		`, identifierID1, assetID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM asset_identifiers WHERE id = $1`, identifierID1)
+
+		_, err = db.Exec(`
+			INSERT INTO asset_identifiers (id, asset_id, source, external_id, created_at, updated_at)
+			VALUES ($1, $2, 'coingecko', 'bitcoin_different', $3, $3)
+		`, identifierID2, assetID, now)
+		assert.Error(t, err, "Should fail with duplicate asset+source")
+		assert.Contains(t, err.Error(), "unique_asset_source", "Error should mention unique constraint")
+	})
+}
+
+func TestMigrations_SymbolIdentifiersTable(t *testing.T) {
+	db := getTestDB(t)
+	defer db.Close()
+
+	// Setup: Create test assets and symbol
+	baseAssetID := uuid.New()
+	quoteAssetID := uuid.New()
+	symbolID := uuid.New()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	_, err := db.Exec(`
+		INSERT INTO assets (id, symbol, name, type, created_at, updated_at)
+		VALUES 
+			($1, 'BTC', 'Bitcoin', 'CRYPTOCURRENCY', $3, $3),
+			($2, 'USDT', 'Tether', 'STABLECOIN', $3, $3)
+	`, baseAssetID, quoteAssetID, now)
+	require.NoError(t, err)
+	defer db.Exec(`DELETE FROM assets WHERE id IN ($1, $2)`, baseAssetID, quoteAssetID)
+
+	_, err = db.Exec(`
+		INSERT INTO symbols (id, base_asset_id, quote_asset_id, symbol_type, tick_size, lot_size, min_order_size, max_order_size, created_at, updated_at)
+		VALUES ($1, $2, $3, 'SPOT', 0.01, 0.001, 0.001, 1000, $4, $4)
+	`, symbolID, baseAssetID, quoteAssetID, now)
+	require.NoError(t, err)
+	defer func() {
+		db.Exec(`DELETE FROM symbol_identifiers WHERE symbol_id = $1`, symbolID)
+		db.Exec(`DELETE FROM symbols WHERE id = $1`, symbolID)
+	}()
+
+	t.Run("table exists", func(t *testing.T) {
+		var exists bool
+		err := db.QueryRow(`
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables 
+				WHERE table_schema = 'public' 
+				AND table_name = 'symbol_identifiers'
+			)
+		`).Scan(&exists)
+		require.NoError(t, err)
+		assert.True(t, exists, "symbol_identifiers table should exist")
+	})
+
+	t.Run("can insert and query symbol identifier", func(t *testing.T) {
+		identifierID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO symbol_identifiers (id, symbol_id, source, external_id, is_primary, created_at, updated_at)
+			VALUES ($1, $2, 'coingecko', 'btc-usdt', true, $3, $3)
+		`, identifierID, symbolID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM symbol_identifiers WHERE id = $1`, identifierID)
+
+		var source, externalID string
+		err = db.QueryRow(`SELECT source, external_id FROM symbol_identifiers WHERE id = $1`, identifierID).
+			Scan(&source, &externalID)
+		require.NoError(t, err)
+		assert.Equal(t, "coingecko", source)
+		assert.Equal(t, "btc-usdt", externalID)
+	})
+}
+
+func TestMigrations_VenueAssetsTable(t *testing.T) {
+	db := getTestDB(t)
+	defer db.Close()
+
+	// Setup: Create test venue, asset
+	venueID := "binance"
+	assetID := uuid.New()
+	chainID := "ethereum"
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	_, err := db.Exec(`INSERT INTO chains (id, name, chain_type, created_at) VALUES ($1, 'Ethereum', 'EVM', $2)`, chainID, now)
+	require.NoError(t, err)
+	defer db.Exec(`DELETE FROM chains WHERE id = $1`, chainID)
+
+	_, err = db.Exec(`
+		INSERT INTO venues (id, name, venue_type, created_at)
+		VALUES ($1, 'Binance', 'CEX', $2)
+	`, venueID, now)
+	require.NoError(t, err)
+	defer db.Exec(`DELETE FROM venues WHERE id = $1`, venueID)
+
+	_, err = db.Exec(`
+		INSERT INTO assets (id, symbol, name, type, created_at, updated_at)
+		VALUES ($1, 'BTC', 'Bitcoin', 'CRYPTOCURRENCY', $2, $2)
+	`, assetID, now)
+	require.NoError(t, err)
+	defer func() {
+		db.Exec(`DELETE FROM venue_assets WHERE venue_id = $1 OR asset_id = $2`, venueID, assetID)
+		db.Exec(`DELETE FROM assets WHERE id = $1`, assetID)
+	}()
+
+	t.Run("table exists", func(t *testing.T) {
+		var exists bool
+		err := db.QueryRow(`
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables 
+				WHERE table_schema = 'public' 
+				AND table_name = 'venue_assets'
+			)
+		`).Scan(&exists)
+		require.NoError(t, err)
+		assert.True(t, exists, "venue_assets table should exist")
+	})
+
+	t.Run("has required indexes", func(t *testing.T) {
+		expectedIndexes := []string{
+			"idx_venue_assets_venue_id",
+			"idx_venue_assets_asset_id",
+			"idx_venue_assets_venue_asset",
+			"idx_venue_assets_trading_enabled",
+		}
+
+		for _, indexName := range expectedIndexes {
+			var exists bool
+			err := db.QueryRow(`
+				SELECT EXISTS (
+					SELECT FROM pg_indexes
+					WHERE schemaname = 'public'
+					AND tablename = 'venue_assets'
+					AND indexname = $1
+				)
+			`, indexName).Scan(&exists)
+			require.NoError(t, err)
+			assert.True(t, exists, "Index %s should exist", indexName)
+		}
+	})
+
+	t.Run("can insert and query venue asset", func(t *testing.T) {
+		venueAssetID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO venue_assets (id, venue_id, asset_id, venue_symbol, deposit_enabled, withdraw_enabled, trading_enabled, withdraw_fee, created_at, updated_at)
+			VALUES ($1, $2, $3, 'BTC', true, true, true, 0.0005, $4, $4)
+		`, venueAssetID, venueID, assetID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM venue_assets WHERE id = $1`, venueAssetID)
+
+		var venueSymbol string
+		var depositEnabled, withdrawEnabled, tradingEnabled bool
+		err = db.QueryRow(`SELECT venue_symbol, deposit_enabled, withdraw_enabled, trading_enabled FROM venue_assets WHERE id = $1`, venueAssetID).
+			Scan(&venueSymbol, &depositEnabled, &withdrawEnabled, &tradingEnabled)
+		require.NoError(t, err)
+		assert.Equal(t, "BTC", venueSymbol)
+		assert.True(t, depositEnabled)
+		assert.True(t, withdrawEnabled)
+		assert.True(t, tradingEnabled)
+	})
+
+	t.Run("enforces unique venue+asset constraint", func(t *testing.T) {
+		venueAssetID1 := uuid.New()
+		venueAssetID2 := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO venue_assets (id, venue_id, asset_id, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $4)
+		`, venueAssetID1, venueID, assetID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM venue_assets WHERE id = $1`, venueAssetID1)
+
+		_, err = db.Exec(`
+			INSERT INTO venue_assets (id, venue_id, asset_id, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $4)
+		`, venueAssetID2, venueID, assetID, now)
+		assert.Error(t, err, "Should fail with duplicate venue+asset")
+		assert.Contains(t, err.Error(), "unique_venue_asset", "Error should mention unique constraint")
+	})
+}
+
+func TestMigrations_VenueSymbolsTable(t *testing.T) {
+	db := getTestDB(t)
+	defer db.Close()
+
+	// Setup: Create test venue, assets, symbol
+	venueID := "binance"
+	baseAssetID := uuid.New()
+	quoteAssetID := uuid.New()
+	symbolID := uuid.New()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	_, err := db.Exec(`
+		INSERT INTO venues (id, name, venue_type, created_at)
+		VALUES ($1, 'Binance', 'CEX', $2)
+	`, venueID, now)
+	require.NoError(t, err)
+	defer db.Exec(`DELETE FROM venues WHERE id = $1`, venueID)
+
+	_, err = db.Exec(`
+		INSERT INTO assets (id, symbol, name, type, created_at, updated_at)
+		VALUES 
+			($1, 'BTC', 'Bitcoin', 'CRYPTOCURRENCY', $3, $3),
+			($2, 'USDT', 'Tether', 'STABLECOIN', $3, $3)
+	`, baseAssetID, quoteAssetID, now)
+	require.NoError(t, err)
+	defer db.Exec(`DELETE FROM assets WHERE id IN ($1, $2)`, baseAssetID, quoteAssetID)
+
+	_, err = db.Exec(`
+		INSERT INTO symbols (id, base_asset_id, quote_asset_id, symbol_type, tick_size, lot_size, min_order_size, max_order_size, created_at, updated_at)
+		VALUES ($1, $2, $3, 'SPOT', 0.01, 0.001, 0.001, 1000, $4, $4)
+	`, symbolID, baseAssetID, quoteAssetID, now)
+	require.NoError(t, err)
+	defer func() {
+		db.Exec(`DELETE FROM venue_symbols WHERE venue_id = $1 OR symbol_id = $2`, venueID, symbolID)
+		db.Exec(`DELETE FROM symbols WHERE id = $1`, symbolID)
+	}()
+
+	t.Run("table exists", func(t *testing.T) {
+		var exists bool
+		err := db.QueryRow(`
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables 
+				WHERE table_schema = 'public' 
+				AND table_name = 'venue_symbols'
+			)
+		`).Scan(&exists)
+		require.NoError(t, err)
+		assert.True(t, exists, "venue_symbols table should exist")
+	})
+
+	t.Run("has required indexes including critical cqmd lookup", func(t *testing.T) {
+		expectedIndexes := []string{
+			"idx_venue_symbols_venue_id",
+			"idx_venue_symbols_symbol_id",
+			"idx_venue_symbols_venue_string", // CRITICAL for GetVenueSymbol(venue_id, venue_symbol) queries
+		}
+
+		for _, indexName := range expectedIndexes {
+			var exists bool
+			err := db.QueryRow(`
+				SELECT EXISTS (
+					SELECT FROM pg_indexes
+					WHERE schemaname = 'public'
+					AND tablename = 'venue_symbols'
+					AND indexname = $1
+				)
+			`, indexName).Scan(&exists)
+			require.NoError(t, err)
+			assert.True(t, exists, "Index %s should exist", indexName)
+		}
+	})
+
+	t.Run("can insert and query venue symbol", func(t *testing.T) {
+		venueSymbolID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO venue_symbols (id, venue_id, symbol_id, venue_symbol, maker_fee, taker_fee, is_active, created_at, updated_at)
+			VALUES ($1, $2, $3, 'BTCUSDT', 0.001, 0.001, true, $4, $4)
+		`, venueSymbolID, venueID, symbolID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM venue_symbols WHERE id = $1`, venueSymbolID)
+
+		var venueSymbol string
+		var makerFee, takerFee float64
+		var isActive bool
+		err = db.QueryRow(`SELECT venue_symbol, maker_fee, taker_fee, is_active FROM venue_symbols WHERE id = $1`, venueSymbolID).
+			Scan(&venueSymbol, &makerFee, &takerFee, &isActive)
+		require.NoError(t, err)
+		assert.Equal(t, "BTCUSDT", venueSymbol)
+		assert.Equal(t, 0.001, makerFee)
+		assert.Equal(t, 0.001, takerFee)
+		assert.True(t, isActive)
+	})
+
+	t.Run("enforces unique venue+symbol constraint", func(t *testing.T) {
+		venueSymbolID1 := uuid.New()
+		venueSymbolID2 := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO venue_symbols (id, venue_id, symbol_id, venue_symbol, created_at, updated_at)
+			VALUES ($1, $2, $3, 'BTCUSDT', $4, $4)
+		`, venueSymbolID1, venueID, symbolID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM venue_symbols WHERE id = $1`, venueSymbolID1)
+
+		_, err = db.Exec(`
+			INSERT INTO venue_symbols (id, venue_id, symbol_id, venue_symbol, created_at, updated_at)
+			VALUES ($1, $2, $3, 'BTCUSDT2', $4, $4)
+		`, venueSymbolID2, venueID, symbolID, now)
+		assert.Error(t, err, "Should fail with duplicate venue+symbol")
+		assert.Contains(t, err.Error(), "unique_venue_symbol", "Error should mention unique constraint")
+	})
+
+	t.Run("enforces unique venue_symbol string per venue", func(t *testing.T) {
+		symbolID2 := uuid.New()
+		venueSymbolID1 := uuid.New()
+		venueSymbolID2 := uuid.New()
+
+		// Create another symbol
+		_, err := db.Exec(`
+			INSERT INTO symbols (id, base_asset_id, quote_asset_id, symbol_type, tick_size, lot_size, min_order_size, max_order_size, created_at, updated_at)
+			VALUES ($1, $2, $3, 'SPOT', 0.01, 0.001, 0.001, 1000, $4, $4)
+		`, symbolID2, baseAssetID, quoteAssetID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM symbols WHERE id = $1`, symbolID2)
+
+		_, err = db.Exec(`
+			INSERT INTO venue_symbols (id, venue_id, symbol_id, venue_symbol, created_at, updated_at)
+			VALUES ($1, $2, $3, 'BTCUSDT', $4, $4)
+		`, venueSymbolID1, venueID, symbolID, now)
+		require.NoError(t, err)
+		defer db.Exec(`DELETE FROM venue_symbols WHERE id = $1`, venueSymbolID1)
+
+		// Try to insert different symbol with same venue_symbol string
+		_, err = db.Exec(`
+			INSERT INTO venue_symbols (id, venue_id, symbol_id, venue_symbol, created_at, updated_at)
+			VALUES ($1, $2, $3, 'BTCUSDT', $4, $4)
+		`, venueSymbolID2, venueID, symbolID2, now)
+		assert.Error(t, err, "Should fail with duplicate venue_symbol string")
+		assert.Contains(t, err.Error(), "unique_venue_symbol_string", "Error should mention unique venue_symbol_string constraint")
+	})
+
+	t.Run("enforces fee range constraints", func(t *testing.T) {
+		venueSymbolID := uuid.New()
+
+		_, err := db.Exec(`
+			INSERT INTO venue_symbols (id, venue_id, symbol_id, venue_symbol, maker_fee, taker_fee, created_at, updated_at)
+			VALUES ($1, $2, $3, 'TESTBTC', 1.5, 0.001, $4, $4)
+		`, venueSymbolID, venueID, symbolID, now)
+		assert.Error(t, err, "Should fail with maker_fee > 100%")
+		assert.Contains(t, err.Error(), "chk_maker_fee_range", "Error should mention maker_fee constraint")
+	})
+}
