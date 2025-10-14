@@ -2,421 +2,422 @@
 
 ## Progress Checklist
 - [ ] **Commit 1**: Project Foundation & Configuration
-- [ ] **Commit 2**: Database Schema - Core Tables
-- [ ] **Commit 3**: Database Schema - Relationships & Indexes
-- [ ] **Commit 4**: Domain Models & Errors
-- [ ] **Commit 5**: Repository Interfaces
-- [ ] **Commit 6**: Asset Repository Implementation
-- [ ] **Commit 7**: Chain & Venue Repository Implementation
-- [ ] **Commit 8**: Deployment & Identifier Repository Implementation
-- [ ] **Commit 9**: Relationship & Group Repository Implementation
-- [ ] **Commit 10**: Quality Flag Repository Implementation
-- [ ] **Commit 11**: Event Publisher Integration
-- [ ] **Commit 12**: gRPC Service - Asset Operations
-- [ ] **Commit 13**: gRPC Service - Deployment & Chain Operations
-- [ ] **Commit 14**: gRPC Service - Relationship & Group Operations
-- [ ] **Commit 15**: gRPC Service - Quality & Venue Operations
-- [ ] **Commit 16**: Redis Cache Layer
-- [ ] **Commit 17**: Integration Tests & Fixtures
-- [ ] **Commit 18**: Performance Optimization & Documentation
+- [ ] **Commit 2**: Database Schema & Migrations (Core Tables)
+- [ ] **Commit 3**: Database Schema & Migrations (Relationship Tables)
+- [ ] **Commit 4**: Repository Layer - Asset Domain
+- [ ] **Commit 5**: Repository Layer - Symbol & Chain Domain
+- [ ] **Commit 6**: Repository Layer - Venue & Mapping Domain
+- [ ] **Commit 7**: Business Logic - Asset Management
+- [ ] **Commit 8**: Business Logic - Symbol & Venue Management
+- [ ] **Commit 9**: gRPC Server & Service Integration
+- [ ] **Commit 10**: Event Publishing System
+- [ ] **Commit 11**: Cache Layer Integration
+- [ ] **Commit 12**: Integration Tests & Validation
+- [ ] **Final**: Documentation & Deployment Configuration
+
+---
 
 ## Implementation Sequence
 
 ### Commit 1: Project Foundation & Configuration
 
-**Goal**: Bootstrap Go project with CQC/CQI dependencies and build infrastructure.
-**Depends**: None
+**Goal**: Establish project structure with CQC/CQI dependencies and configuration management.
+**Depends**: none
 
 **Deliverables**:
-- [ ] `go.mod` with Go 1.21+, CQC, CQI, pgx/v5, go-playground/validator, testify dependencies
-- [ ] `cmd/server/main.go` with config loading and graceful shutdown
-- [ ] `Makefile` with build, test, migrate, and run targets
-- [ ] `.github/copilot-instructions.md` with development guidelines
-- [ ] `README.md` with setup instructions and architecture overview
+- [ ] `go.mod` with CQC (github.com/Combine-Capital/cqc) and CQI (github.com/Combine-Capital/cqi) dependencies
+- [ ] `cmd/server/main.go` skeleton with CQI bootstrap initialization
+- [ ] `internal/config/config.go` extending CQI config types with CQAR-specific settings
+- [ ] `config.yaml`, `config.dev.yaml`, `config.prod.yaml` with database, cache, event bus configuration
+- [ ] `Makefile` with build, test, run, migrate targets
+- [ ] `.gitignore` excluding binaries, vendor, IDE files
+- [ ] `README.md` with service overview and setup instructions
 
 **Success**:
-- `go build ./cmd/server` compiles without errors
-- `make help` displays available commands
+- `go mod tidy` resolves all dependencies without errors
+- `make build` produces cqar binary in cmd/server/
+- `./cmd/server/cqar --help` displays service information
 
 ---
 
-### Commit 2: Database Schema - Core Tables
+### Commit 2: Database Schema & Migrations (Core Tables)
 
-**Goal**: Create PostgreSQL migrations for assets, chains, and venues tables.
+**Goal**: Create foundational database tables for assets, symbols, chains, and venues.
 **Depends**: Commit 1
 
 **Deliverables**:
-- [ ] `migrations/001_create_assets.up.sql` with assets table, symbol/type/category indexes, soft-delete support
-- [ ] `migrations/001_create_assets.down.sql` with rollback
-- [ ] `migrations/006_create_chains.up.sql` with chains table and chain_id PK (numbered 006 to allow FK dependencies)
-- [ ] `migrations/006_create_chains.down.sql` with rollback
-- [ ] `migrations/007_create_venues.up.sql` with venues table and venue_type field (numbered 007 for consistency)
-- [ ] `migrations/007_create_venues.down.sql` with rollback
+- [ ] `migrations/000001_create_assets_table.up.sql` with assets table (id, symbol, name, type, category, metadata fields, timestamps)
+- [ ] `migrations/000001_create_assets_table.down.sql` with DROP TABLE assets
+- [ ] `migrations/000002_create_symbols_table.up.sql` with symbols table (id, base/quote/settlement asset FKs, type, market specs, option fields)
+- [ ] `migrations/000003_create_chains_table.up.sql` with chains table (id, name, type, native_asset_id FK, rpc_urls array, explorer_url)
+- [ ] `migrations/000004_create_venues_table.up.sql` with venues table (id, name, type, chain_id FK, metadata, is_active)
+- [ ] All indexes: idx_assets_symbol, idx_assets_type, idx_symbols_base_asset, idx_symbols_quote_asset, idx_venues_type
 
 **Success**:
-- `migrate up` creates tables in test PostgreSQL instance
-- `migrate down` removes tables cleanly
+- `make migrate-up` executes migrations against PostgreSQL without errors
+- `psql` shows assets, symbols, chains, venues tables with correct schema
+- `make migrate-down` successfully rolls back all migrations
 
 ---
 
-### Commit 3: Database Schema - Relationships & Indexes
+### Commit 3: Database Schema & Migrations (Relationship Tables)
 
-**Goal**: Create migrations for deployments, identifiers, relationships, groups, flags, and venue symbols.
+**Goal**: Create tables for deployments, relationships, quality flags, groups, identifiers, and venue mappings.
 **Depends**: Commit 2
 
 **Deliverables**:
-- [ ] `migrations/002_create_deployments.up.sql` with asset_deployments table, FKs to assets/chains, unique constraint on (chain_id, contract_address)
-- [ ] `migrations/002_create_deployments.down.sql` with rollback
-- [ ] `migrations/003_create_relationships.up.sql` with asset_relationships table, parent/child FKs, composite PK
-- [ ] `migrations/003_create_relationships.down.sql` with rollback
-- [ ] `migrations/004_create_groups.up.sql` with asset_groups and asset_group_members tables
-- [ ] `migrations/004_create_groups.down.sql` with rollback
-- [ ] `migrations/005_create_quality_flags.up.sql` with asset_quality_flags table, severity/cleared_at indexes
-- [ ] `migrations/005_create_quality_flags.down.sql` with rollback
-- [ ] `migrations/007_create_venue_symbols.up.sql` with venue_symbols table, (venue_id, symbol) unique constraint
-- [ ] `migrations/007_create_venue_symbols.down.sql` with rollback
-- [ ] `migrations/008_create_indexes.up.sql` with performance indexes for (symbol, asset_type), (source), (venue_id, symbol)
-- [ ] `migrations/008_create_indexes.down.sql` with rollback
+- [ ] `migrations/000005_create_deployments_table.up.sql` with deployments table (asset_id FK, chain_id, contract_address, decimals, is_canonical)
+- [ ] `migrations/000006_create_relationships_table.up.sql` with relationships table (from/to asset_id FKs, type, conversion_rate, protocol)
+- [ ] `migrations/000007_create_quality_flags_table.up.sql` with quality_flags table (asset_id FK, type, severity, source, reason, timestamps)
+- [ ] `migrations/000008_create_asset_groups_table.up.sql` with asset_groups and group_members tables
+- [ ] `migrations/000009_create_asset_identifiers_table.up.sql` with asset_identifiers table (asset_id FK, source, external_id, is_primary)
+- [ ] `migrations/000010_create_symbol_identifiers_table.up.sql` with symbol_identifiers table (symbol_id FK, source, external_id, is_primary)
+- [ ] `migrations/000011_create_venue_assets_table.up.sql` with venue_assets table (venue_id/asset_id FKs, venue_symbol, availability flags, fees)
+- [ ] `migrations/000012_create_venue_symbols_table.up.sql` with venue_symbols table (venue_id/symbol_id FKs, venue_symbol, fees, status)
+- [ ] All composite unique constraints and indexes
 
 **Success**:
-- All 10 tables exist after `migrate up`
-- FK constraints enforced (inserting deployment with invalid asset_id fails)
+- `make migrate-up` applies all 12 migrations successfully
+- Foreign key constraints enforced (INSERT into deployments with invalid asset_id fails)
+- Unique constraints work (duplicate venue_id + asset_id in venue_assets fails)
 
 ---
 
-### Commit 4: Domain Models & Errors
+### Commit 4: Repository Layer - Asset Domain
 
-**Goal**: Define domain models and business error types for all entities.
-**Depends**: Commit 1
+**Goal**: Implement data access layer for assets, deployments, relationships, groups, and quality flags.
+**Depends**: Commit 3
 
 **Deliverables**:
-- [ ] `internal/domain/asset.go` with Asset struct, NewAsset constructor, validation methods
-- [ ] `internal/domain/deployment.go` with AssetDeployment struct, chain/address validation
-- [ ] `internal/domain/relationship.go` with AssetRelationship struct, RelationshipType constants
-- [ ] `internal/domain/group.go` with AssetGroup and AssetGroupMember structs
-- [ ] `internal/domain/quality.go` with AssetQualityFlag struct, FlagType/FlagSeverity constants
-- [ ] `internal/domain/chain.go` with Chain struct, ChainType constants
-- [ ] `internal/domain/venue.go` with Venue and VenueSymbol structs, VenueType constants
-- [ ] `internal/domain/errors.go` with ErrAssetNotFound, ErrDeploymentExists, ErrInvalidRelationship domain errors
+- [ ] `internal/repository/repository.go` defining Repository interface with all CRUD method signatures
+- [ ] `internal/repository/postgres.go` implementing PostgreSQL connection via CQI database package
+- [ ] `internal/repository/asset.go` with CreateAsset, GetAsset, UpdateAsset, DeleteAsset, ListAssets, SearchAssets
+- [ ] `internal/repository/deployment.go` with CreateAssetDeployment, GetAssetDeployment, ListAssetDeployments (by asset, by chain)
+- [ ] `internal/repository/relationship.go` with CreateAssetRelationship, ListAssetRelationships (by asset, by type)
+- [ ] `internal/repository/quality_flag.go` with RaiseQualityFlag, ResolveQualityFlag, ListQualityFlags (by asset, by severity)
+- [ ] `internal/repository/asset_group.go` with CreateAssetGroup, GetAssetGroup, AddAssetToGroup, RemoveAssetFromGroup
+- [ ] All methods return CQC protobuf types (Asset, AssetDeployment, AssetRelationship, QualityFlag)
+- [ ] Transaction helpers using CQI WithTransaction for multi-table operations
 
 **Success**:
-- Domain structs compile with proper field tags
-- NewAsset("BTC", "Bitcoin", ASSET_TYPE_NATIVE) returns valid Asset
-- ErrAssetNotFound is distinct error type (not wrapping sql.ErrNoRows)
+- Unit tests pass: Create asset → GetAsset returns same data
+- SearchAssets with pagination returns correct page size
+- ListAssetRelationships filters by WRAPS type correctly
+- Transaction rollback works: CreateAsset + AddAssetToGroup fails if group doesn't exist
 
 ---
 
-### Commit 5: Repository Interfaces
+### Commit 5: Repository Layer - Symbol & Chain Domain
 
-**Goal**: Define repository interfaces for data access abstraction.
+**Goal**: Implement data access layer for symbols, symbol identifiers, asset identifiers, and chains.
+**Depends**: Commit 3
+
+**Deliverables**:
+- [ ] `internal/repository/symbol.go` with CreateSymbol, GetSymbol, UpdateSymbol, DeleteSymbol, ListSymbols, SearchSymbols
+- [ ] `internal/repository/symbol.go` validates base_asset_id and quote_asset_id exist before insert
+- [ ] `internal/repository/chain.go` with CreateChain, GetChain, ListChains
+- [ ] `internal/repository/asset.go` extended with CreateAssetIdentifier, GetAssetIdentifier, ListAssetIdentifiers (by asset, by source)
+- [ ] `internal/repository/symbol.go` extended with CreateSymbolIdentifier, GetSymbolIdentifier, ListSymbolIdentifiers (by symbol, by source)
+- [ ] All methods return CQC protobuf types (Symbol, Chain, AssetIdentifier, SymbolIdentifier)
+- [ ] SearchSymbols filters by base_asset_id, quote_asset_id, symbol_type with pagination
+
+**Success**:
+- CreateSymbol with invalid base_asset_id fails with foreign key error
+- GetSymbol returns market specs (tick_size, lot_size) correctly
+- ListSymbols filters by symbol_type=SPOT returns only spot symbols
+- CreateChain populates rpc_urls array correctly
+
+---
+
+### Commit 6: Repository Layer - Venue & Mapping Domain
+
+**Goal**: Implement data access layer for venues, venue assets, and venue symbols.
+**Depends**: Commit 3
+
+**Deliverables**:
+- [ ] `internal/repository/venue.go` with CreateVenue, GetVenue, ListVenues
+- [ ] `internal/repository/venue_asset.go` with CreateVenueAsset, GetVenueAsset, ListVenueAssets (by venue, by asset)
+- [ ] `internal/repository/venue_asset.go` queries "which venues trade BTC?" and "which assets on Binance?"
+- [ ] `internal/repository/venue_symbol.go` with CreateVenueSymbol, GetVenueSymbol, ListVenueSymbols (by venue, by symbol, by venue_symbol string)
+- [ ] `internal/repository/venue_symbol.go` implements GetVenueSymbol(venue_id, venue_symbol) for cqmd use case
+- [ ] All methods return CQC protobuf types (Venue, VenueAsset, VenueSymbol)
+- [ ] Composite queries join venue_symbols with symbols to return enriched VenueSymbol + Symbol data
+
+**Success**:
+- CreateVenueAsset with deposit_enabled=true sets flag correctly
+- GetVenueSymbol("binance", "BTCUSDT") returns VenueSymbol with canonical symbol_id
+- ListVenueAssets(venue_id="binance") returns all Binance assets
+- ListVenueAssets(asset_id="btc") returns all venues trading BTC
+
+---
+
+### Commit 7: Business Logic - Asset Management
+
+**Goal**: Implement business logic for asset validation, collision resolution, relationships, and quality flags.
 **Depends**: Commit 4
 
 **Deliverables**:
-- [ ] `internal/repository/interface.go` with AssetRepository, DeploymentRepository, RelationshipRepository, GroupRepository, QualityFlagRepository, ChainRepository, VenueRepository interfaces
-- [ ] Each interface defines CRUD methods: Create, Get, Update, Delete, List, Search with context.Context as first parameter
-- [ ] List methods accept pagination (limit, offset) and filter parameters
-- [ ] Search methods accept query string and filter options
+- [ ] `internal/manager/asset.go` with AssetManager struct holding Repository and EventPublisher dependencies
+- [ ] AssetManager.CreateAsset validates required fields (symbol, name, type), checks symbol collision across chains
+- [ ] AssetManager.CreateAssetDeployment validates contract_address format per chain_type, decimals range (0-18)
+- [ ] AssetManager.CreateAssetRelationship validates relationship_type enum, detects cycles in relationship graph
+- [ ] AssetManager.CreateAssetGroup validates member assets exist before adding
+- [ ] `internal/manager/quality.go` with QualityManager for flag validation
+- [ ] QualityManager.RaiseQualityFlag validates severity, enforces CRITICAL blocks on trading operations
+- [ ] QualityManager.IsAssetTradeable returns false if active CRITICAL flag exists
+- [ ] All validation errors return descriptive messages for gRPC status codes
 
 **Success**:
-- Interfaces compile without implementation
-- Method signatures enforce context.Context first parameter pattern
-- Return types use domain models from Commit 4
+- CreateAsset with empty symbol returns validation error
+- CreateAsset with "USDC" on Ethereum succeeds, "USDC" on Polygon gets different UUID
+- CreateAssetRelationship with WRAPS type stores bidirectional relationship
+- RaiseQualityFlag with CRITICAL severity → IsAssetTradeable returns false
 
 ---
 
-### Commit 6: Asset Repository Implementation
+### Commit 8: Business Logic - Symbol & Venue Management
 
-**Goal**: Implement PostgreSQL repository for assets with CRUD operations.
-**Depends**: Commits 3, 4, 5
+**Goal**: Implement business logic for symbol validation, venue management, and availability tracking.
+**Depends**: Commit 5, Commit 6
 
 **Deliverables**:
-- [ ] `internal/repository/postgres/asset.go` implementing AssetRepository interface using CQI Database
-- [ ] CreateAsset with UUID generation, INSERT, event data return
-- [ ] GetAsset with WHERE deleted_at IS NULL filter
-- [ ] UpdateAsset with UPDATE and updated_at timestamp
-- [ ] DeleteAsset with soft-delete (SET deleted_at = NOW())
-- [ ] ListAssets with pagination, filters (asset_type, category), ORDER BY symbol
-- [ ] SearchAssets with ILIKE on symbol/name, collision detection (return multiple matches)
-- [ ] `internal/repository/postgres/queries.sql` with documented SQL queries
+- [ ] `internal/manager/symbol.go` with SymbolManager validating symbol creation and market specs
+- [ ] SymbolManager.CreateSymbol validates base_asset_id and quote_asset_id exist via AssetManager
+- [ ] SymbolManager.CreateSymbol validates market specs: tick_size > 0, lot_size > 0, min_order_size < max_order_size
+- [ ] SymbolManager.CreateSymbol validates option fields: strike_price > 0, expiry > now, valid option_type (CALL/PUT)
+- [ ] `internal/manager/venue.go` with VenueManager for venue and availability operations
+- [ ] VenueManager.CreateVenueAsset validates asset and venue exist, venue_symbol format matches venue type
+- [ ] VenueManager.CreateVenueSymbol validates symbol and venue exist, fees are 0-100% range
+- [ ] VenueManager.GetVenueSymbol enriches response with canonical Symbol data for market specs
 
 **Success**:
-- CreateAsset inserts row, returns Asset with generated UUID
-- GetAsset("deleted-id") returns ErrAssetNotFound (soft-deleted excluded)
-- SearchAssets("USDC") returns multiple assets if collision exists
-- ListAssets with pagination returns correct page and total count
+- CreateSymbol with tick_size=0 returns validation error
+- CreateSymbol with symbol_type=OPTION requires strike_price and expiry fields
+- CreateVenueAsset with maker_fee=150% returns validation error
+- GetVenueSymbol("binance", "BTCUSDT") returns enriched data with tick_size from canonical symbol
 
 ---
 
-### Commit 7: Chain & Venue Repository Implementation
+### Commit 9: gRPC Server & Service Integration
 
-**Goal**: Implement repositories for blockchain and venue registries.
-**Depends**: Commits 3, 4, 5
+**Goal**: Implement gRPC server exposing AssetRegistry interface with CQI service lifecycle.
+**Depends**: Commit 7, Commit 8
 
 **Deliverables**:
-- [ ] `internal/repository/postgres/chain.go` implementing ChainRepository interface
-- [ ] CreateChain, GetChain, ListChains methods with metadata JSONB support
-- [ ] `internal/repository/postgres/venue.go` implementing VenueRepository interface
-- [ ] CreateVenue, GetVenue, ListVenues methods
-- [ ] CreateVenueSymbol, GetVenueSymbol, ListVenueSymbols methods with (venue_id, symbol) unique constraint handling
-- [ ] VenueSymbol lookups support asset_id FK joins
+- [ ] `internal/server/server.go` implementing all AssetRegistry gRPC methods from CQC interface
+- [ ] Server struct embeds `pb.UnimplementedAssetRegistryServer` and holds manager dependencies
+- [ ] All gRPC methods (48 total) call corresponding manager methods and wrap errors with status.Error()
+- [ ] gRPC methods translate validation errors to INVALID_ARGUMENT, not found to NOT_FOUND, panics to INTERNAL
+- [ ] `internal/service/service.go` implementing cqi.Service interface (Start, Stop, Name, Health)
+- [ ] Service.Start initializes database pool, managers, gRPC server, HTTP server (health endpoints)
+- [ ] Service.Stop implements graceful shutdown with 30s timeout, closes database/cache connections
+- [ ] `cmd/server/main.go` uses CQI bootstrap to load config, initialize logging/metrics/tracing, start service
+- [ ] gRPC middleware chain: auth → logging → metrics → tracing applied to all methods
 
 **Success**:
-- CreateChain("ethereum", "Ethereum", EVM) inserts chain
-- CreateVenueSymbol("binance", "BTCUSDT", btc-asset-id) maps ticker to canonical asset
-- GetVenueSymbol("binance", "BTCUSDT") returns asset_id <10ms (indexed lookup)
-- Duplicate (venue_id, symbol) returns error
+- `make run` starts service, logs "gRPC server listening on :9090"
+- `grpcurl localhost:9090 list` shows AssetRegistry service methods
+- `grpcurl -d '{"symbol":"BTC"}' localhost:9090 AssetRegistry.CreateAsset` returns valid UUID
+- Health check: `curl localhost:8080/health/ready` returns 200 with component status
+- SIGTERM triggers graceful shutdown, closes connections cleanly
 
 ---
 
-### Commit 8: Deployment & Identifier Repository Implementation
+### Commit 10: Event Publishing System
 
-**Goal**: Implement repositories for asset deployments and external identifiers.
-**Depends**: Commits 3, 4, 5, 6
+**Goal**: Implement event publishing for all domain lifecycle events via CQI event bus.
+**Depends**: Commit 9
 
 **Deliverables**:
-- [ ] `internal/repository/postgres/deployment.go` implementing DeploymentRepository interface
-- [ ] CreateAssetDeployment with (chain_id, contract_address) uniqueness check
-- [ ] GetAssetDeployment, ListAssetDeployments with asset_id and chain_id filters
-- [ ] GetDeploymentByAddress with (chain_id, address) lookup
-- [ ] Asset identifier CRUD in asset.go with external_id mappings (CoinGecko, CMC, DeFiLlama)
-- [ ] CreateAssetIdentifier, GetAssetIdentifier, ListAssetIdentifiers methods
+- [ ] `internal/manager/events.go` with EventPublisher struct using CQI event bus
+- [ ] EventPublisher.PublishAssetCreated builds AssetCreated event from CQC types, publishes to "cqc.events.v1.asset_created"
+- [ ] EventPublisher.PublishAssetDeploymentCreated publishes to "cqc.events.v1.asset_deployment_created"
+- [ ] EventPublisher.PublishRelationshipEstablished publishes to "cqc.events.v1.relationship_established"
+- [ ] EventPublisher.PublishQualityFlagRaised publishes to "cqc.events.v1.quality_flag_raised"
+- [ ] EventPublisher.PublishSymbolCreated publishes to "cqc.events.v1.symbol_created"
+- [ ] EventPublisher.PublishVenueAssetListed publishes to "cqc.events.v1.venue_asset_listed"
+- [ ] EventPublisher.PublishVenueSymbolListed publishes to "cqc.events.v1.venue_symbol_listed"
+- [ ] EventPublisher.PublishChainRegistered publishes to "cqc.events.v1.chain_registered"
+- [ ] All manager methods call EventPublisher after successful repository operations
+- [ ] Event publishing uses CQI automatic protobuf serialization, retry on failure, metrics
 
 **Success**:
-- CreateAssetDeployment(asset-id, "ethereum", "0x123", 18) inserts deployment
-- GetDeploymentByAddress("ethereum", "0x123") returns deployment <20ms
-- Duplicate (chain_id, address) returns ErrDeploymentExists
-- ListAssetDeployments(asset-id) returns all chains for asset
+- CreateAsset successfully publishes AssetCreated event to NATS
+- NATS CLI: `nats sub "cqc.events.v1.asset_created"` receives events when assets created
+- Prometheus metrics: `cqar_event_published_total{event_type="asset_created"}` increments
+- Event publishing failure logs error but doesn't fail CreateAsset operation (async)
 
 ---
 
-### Commit 9: Relationship & Group Repository Implementation
+### Commit 11: Cache Layer Integration
 
-**Goal**: Implement repositories for asset relationships and groupings.
-**Depends**: Commits 3, 4, 5, 6
+**Goal**: Implement Redis cache-aside pattern for high-performance reads (<10ms p50).
+**Depends**: Commit 9
 
 **Deliverables**:
-- [ ] `internal/repository/postgres/relationship.go` implementing RelationshipRepository interface
-- [ ] CreateAssetRelationship with parent/child FK validation, relationship_type
-- [ ] ListAssetRelationships with filters (parent_id, child_id, relationship_type)
-- [ ] GetRelationshipsByType(asset-id, RELATIONSHIP_TYPE_WRAPS) for querying variants
-- [ ] `internal/repository/postgres/group.go` implementing GroupRepository interface
-- [ ] CreateAssetGroup, GetAssetGroup with canonical_symbol lookup
-- [ ] AddAssetToGroup, RemoveAssetFromGroup with membership management
-- [ ] ListAssetGroupMembers with is_canonical flag
+- [ ] `internal/repository/cache.go` with cache-aside helpers using CQI cache package
+- [ ] Cache key functions: assetKey(id), symbolKey(id), venueKey(id), venueAssetKey(venue_id, asset_id), venueSymbolKey(venue_id, venue_symbol)
+- [ ] Repository.GetAsset checks cache first, queries DB on miss, populates cache with 60min TTL
+- [ ] Repository.GetSymbol checks cache first, queries DB on miss, populates cache with 60min TTL
+- [ ] Repository.GetVenue checks cache first, queries DB on miss, populates cache with 60min TTL
+- [ ] Repository.GetVenueAsset checks cache first, queries DB on miss, populates cache with 15min TTL
+- [ ] Repository.GetVenueSymbol checks cache first, queries DB on miss, populates cache with 15min TTL
+- [ ] Repository.ListQualityFlags checks cache with 5min TTL (volatile data)
+- [ ] All cache operations use CQI automatic CQC protobuf serialization/deserialization
+- [ ] Cache hit/miss metrics: `cqar_cache_hit_total`, `cqar_cache_miss_total` by entity type
 
 **Success**:
-- CreateAssetRelationship(eth-id, weth-id, WRAPS) establishes relationship
-- ListAssetRelationships(eth-id) returns WETH, stETH, cbETH children
-- CreateAssetGroup("eth-native", "ETH") creates group
-- AddAssetToGroup(group-id, weth-id, false) adds member
-- GetAssetGroup("ETH") returns all variants for aggregation
+- First GetAsset(id) queries database, second GetAsset(id) hits cache (<5ms)
+- Prometheus metrics: `cqar_cache_hit_total{entity="asset"}` increments on cache hit
+- GetVenueSymbol("binance", "BTCUSDT") achieves <10ms p50 latency (cache hit)
+- Redis CLI: `KEYS venue_symbol:*` shows cached venue symbols
 
 ---
 
-### Commit 10: Quality Flag Repository Implementation
+### Commit 12: Integration Tests & Validation
 
-**Goal**: Implement repository for asset quality flags and security audits.
-**Depends**: Commits 3, 4, 5, 6
+**Goal**: Create end-to-end integration tests validating all user persona workflows.
+**Depends**: Commit 10, Commit 11
 
 **Deliverables**:
-- [ ] `internal/repository/postgres/quality.go` implementing QualityFlagRepository interface
-- [ ] RaiseQualityFlag with flag_type, severity, source (auditor), evidence_url
-- [ ] ResolveQualityFlag with cleared_at timestamp update
-- [ ] ListQualityFlags with filters (asset_id, flag_type, min_severity, active_only, source)
-- [ ] Query optimization with (asset_id, severity, cleared_at) composite index
-- [ ] GetFlagsBySource(asset-id, "certik") for security auditor queries
+- [ ] `test/integration/asset_test.go` testing full asset lifecycle: create → get → update → deploy → relationship → group
+- [ ] `test/integration/symbol_test.go` testing symbol creation with market specs, option-specific fields validation
+- [ ] `test/integration/venue_test.go` testing venue symbol resolution workflow (cqmd use case)
+- [ ] Test: cqmd workflow - CreateVenueSymbol → GetVenueSymbol with venue_symbol string → returns canonical symbol + market specs
+- [ ] Test: cqpm workflow - CreateAssetGroup → GetAssetGroup → validates all ETH variants included
+- [ ] Test: cqvx workflow - GetVenueAsset → validates availability flags (deposit_enabled, trading_enabled)
+- [ ] Test: Quality flag blocking - RaiseQualityFlag with CRITICAL → GetAsset → validates trading blocked
+- [ ] `test/testdata/assets.sql` with seed data (BTC, ETH, USDT, WETH, stETH)
+- [ ] `test/testdata/symbols.sql` with seed data (BTC/USDT spot, ETH/USD perp)
+- [ ] `test/testdata/test_config.yaml` with test database, in-memory cache, test event bus
+- [ ] Docker Compose file for test infrastructure (PostgreSQL, Redis, NATS)
 
 **Success**:
-- RaiseQualityFlag(asset-id, SCAM, CRITICAL, "manual", "proof-url") inserts flag
-- ListQualityFlags(asset-id, CRITICAL, active=true) returns active critical flags <20ms
-- ResolveQualityFlag(flag-id) sets cleared_at, excludes from active queries
-- GetFlagsBySource(asset-id, "certik") returns auditor-specific flags
+- `make test-integration` runs all integration tests with real infrastructure, all tests pass
+- cqmd workflow test: GetVenueSymbol returns data in <50ms p99
+- cqpm workflow test: GetAssetGroup aggregates all ETH variants correctly
+- Quality flag test: CRITICAL-flagged asset blocks trading operations
+- Performance test: 1000 GetAsset calls achieve <20ms p99 latency with cache
 
 ---
 
-### Commit 11: Event Publisher Integration
+### Commit 13: Documentation & Deployment Configuration
 
-**Goal**: Integrate CQI event bus for publishing asset lifecycle events.
-**Depends**: Commits 1, 4
+**Goal**: Complete deployment configuration, documentation, and operational procedures.
+**Depends**: Commit 12
 
 **Deliverables**:
-- [ ] `internal/events/publisher.go` with EventPublisher struct wrapping CQI event bus client
-- [ ] `internal/events/types.go` with event builders for CQC event protos (AssetCreated, AssetDeploymentCreated, RelationshipEstablished, QualityFlagSet, ChainRegistered, VenueSymbolMapped)
-- [ ] PublishAssetCreated(asset) serializes CQC Asset proto, publishes to "assets.created" topic
-- [ ] PublishQualityFlagSet(flag) with severity/flag_type for downstream filtering
-- [ ] Retry logic via CQI for publish failures
-- [ ] Publisher accepts context.Context for timeout/cancellation
+- [ ] `README.md` updated with architecture overview, quick start, API examples
+- [ ] `docs/API.md` with gRPC method documentation and example requests/responses
+- [ ] `docs/DEPLOYMENT.md` with Kubernetes manifests, environment variables, infrastructure requirements
+- [ ] `docs/OPERATIONS.md` with health check endpoints, metrics, troubleshooting guide
+- [ ] Kubernetes manifests: Deployment, Service, ConfigMap, Secret templates
+- [ ] Helm chart (optional) with values.yaml for environment-specific configuration
+- [ ] Production config: `config.prod.yaml` with connection pooling, cache TTLs, log levels
+- [ ] Monitoring dashboards: Grafana dashboard JSON for CQAR metrics
+- [ ] Alerting rules: Prometheus alerts for high error rate, cache miss rate, database latency
 
 **Success**:
-- PublishAssetCreated(asset) publishes event to CQI bus without blocking (<5ms)
-- Event consumer receives valid CQC AssetCreated proto
-- Publish after DB commit prevents inconsistent state
-- Failed publish logs error but doesn't rollback transaction
+- README quick start guides new developer to running service locally in <5 minutes
+- Kubernetes deployment successfully deploys CQAR to cluster, passes health checks
+- Grafana dashboard displays gRPC request latency, cache hit rate, database query duration
+- Prometheus alerts fire when cache hit rate drops below 80%
+- `curl localhost:8080/health/ready` validates database, cache, event bus connectivity
 
 ---
 
-### Commit 12: gRPC Service - Asset Operations
+## Validation Commands
 
-**Goal**: Implement CQC AssetRegistry service methods for asset CRUD.
-**Depends**: Commits 1, 6, 11
+After each commit, validate the working system:
 
-**Deliverables**:
-- [ ] `internal/service/asset_registry.go` with AssetRegistryServer struct implementing CQC AssetRegistry interface
-- [ ] `internal/service/validators.go` with request validation using go-playground/validator
-- [ ] `internal/service/mappers.go` with bidirectional proto ↔ domain conversion
-- [ ] CreateAsset gRPC handler: validate → domain.NewAsset → repo.CreateAsset → PublishAssetCreated → map to proto
-- [ ] GetAsset handler with asset_id validation, ErrAssetNotFound → NotFound status
-- [ ] UpdateAsset handler with partial updates, optimistic locking check
-- [ ] DeleteAsset handler with soft-delete
-- [ ] ListAssets handler with pagination (page_token encoding), filters (asset_type, category)
-- [ ] SearchAssets handler with symbol/name query, collision warnings in response
+**Commit 1**:
+```bash
+go mod tidy
+make build
+./cmd/server/cqar --version
+```
 
-**Success**:
-- CreateAsset("BTC", "Bitcoin") returns Asset proto with generated UUID
-- GetAsset(invalid-id) returns gRPC NotFound status
-- SearchAssets("USDC") returns list with collision metadata if multiple chains
-- ListAssets with page_size=10 returns paginated response with next_page_token
+**Commit 2-3**:
+```bash
+make migrate-up
+psql -h localhost -U cqar -d cqar -c "\dt"  # List tables
+make migrate-down
+```
 
----
+**Commit 4-6**:
+```bash
+go test ./internal/repository/... -v
+```
 
-### Commit 13: gRPC Service - Deployment & Chain Operations
+**Commit 7-8**:
+```bash
+go test ./internal/manager/... -v
+```
 
-**Goal**: Implement gRPC methods for deployments, chains, and identifiers.
-**Depends**: Commits 7, 8, 11, 12
+**Commit 9**:
+```bash
+make run &
+grpcurl -plaintext localhost:9090 list
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+pkill cqar
+```
 
-**Deliverables**:
-- [ ] CreateAssetDeployment handler: validate chain_id exists → repo.CreateAssetDeployment → PublishAssetDeploymentCreated
-- [ ] GetAssetDeployment, ListAssetDeployments handlers with chain/asset filters
-- [ ] CreateAssetIdentifier, GetAssetIdentifier, ListAssetIdentifiers handlers for external ID mapping
-- [ ] CreateChain handler: validate chain_id unique → repo.CreateChain → PublishChainRegistered
-- [ ] GetChain, ListChains handlers with metadata JSONB
-- [ ] Mappers for CQC AssetDeployment, Chain protos
+**Commit 10**:
+```bash
+nats stream ls  # Verify stream exists
+nats sub "cqc.events.v1.asset_created"  # Listen for events
+# In another terminal: create asset via gRPC
+```
 
-**Success**:
-- CreateAssetDeployment(asset-id, "ethereum", "0xabc", 18) creates deployment, publishes event
-- ListAssetDeployments(asset-id) returns all chains for asset
-- CreateChain("arbitrum", "Arbitrum", EVM) registers chain
-- GetChain("ethereum") returns chain with RPC/explorer URLs
+**Commit 11**:
+```bash
+redis-cli KEYS "*"  # Verify cache keys
+# Measure GetAsset latency with ab or wrk
+```
 
----
+**Commit 12**:
+```bash
+docker-compose -f test/docker-compose.yml up -d
+make test-integration
+docker-compose -f test/docker-compose.yml down
+```
 
-### Commit 14: gRPC Service - Relationship & Group Operations
-
-**Goal**: Implement gRPC methods for relationships and asset groupings.
-**Depends**: Commits 9, 11, 12
-
-**Deliverables**:
-- [ ] CreateAssetRelationship handler: validate parent/child exist → repo.CreateAssetRelationship → PublishRelationshipEstablished
-- [ ] ListAssetRelationships handler with parent_id/child_id/type filters
-- [ ] CreateAssetGroup handler with canonical_symbol uniqueness
-- [ ] GetAssetGroup handler with canonical_symbol or group_id lookup
-- [ ] AddAssetToGroup, RemoveAssetFromGroup handlers for membership management
-- [ ] ListAssetGroupMembers for aggregation queries (returns all variants)
-- [ ] Mappers for CQC AssetRelationship, AssetGroup protos
-
-**Success**:
-- CreateAssetRelationship(eth-id, weth-id, WRAPS) establishes relationship, publishes event
-- ListAssetRelationships(eth-id) returns all wrapped/staked variants
-- GetAssetGroup("ETH") returns group with all members (WETH, stETH, cbETH, rETH)
-- AddAssetToGroup adds member, removes with RemoveAssetFromGroup
-
----
-
-### Commit 15: gRPC Service - Quality & Venue Operations
-
-**Goal**: Implement gRPC methods for quality flags and venue symbols.
-**Depends**: Commits 7, 10, 11, 12
-
-**Deliverables**:
-- [ ] RaiseQualityFlag handler: validate asset exists → repo.RaiseQualityFlag → PublishQualityFlagSet
-- [ ] ResolveQualityFlag handler with cleared_at update
-- [ ] ListQualityFlags handler with filters (asset_id, flag_type, min_severity, active_only, source for auditor queries)
-- [ ] CreateVenue handler: validate venue_id unique → repo.CreateVenue
-- [ ] GetVenue, ListVenues handlers
-- [ ] CreateVenueSymbol handler: validate venue/asset exist → repo.CreateVenueSymbol → PublishVenueSymbolMapped
-- [ ] GetVenueSymbol handler for ticker → asset_id resolution
-- [ ] ListVenueSymbols handler with venue_id/asset_id filters
-- [ ] Mappers for CQC AssetQualityFlag, Venue, VenueSymbol protos
-
-**Success**:
-- RaiseQualityFlag(asset-id, SCAM, CRITICAL, "certik", "url") creates flag, publishes event
-- ListQualityFlags(asset-id, min_severity=CRITICAL, active=true) returns active critical flags <20ms
-- CreateVenueSymbol("binance", "BTCUSDT", btc-id) maps ticker
-- GetVenueSymbol("binance", "BTCUSDT") returns btc-id <10ms (for cqmd price mapping)
-- ListQualityFlags with source="certik" filter returns auditor-specific flags
+**Commit 13**:
+```bash
+kubectl apply -f docs/k8s/
+kubectl rollout status deployment/cqar
+kubectl port-forward svc/cqar 9090:9090
+grpcurl -plaintext localhost:9090 AssetRegistry/GetAsset
+```
 
 ---
 
-### Commit 16: Redis Cache Layer
+## Implementation Notes
 
-**Goal**: Implement Redis caching for sub-10ms lookups on hot paths.
-**Depends**: Commits 6, 7, 8, 9, 10, 12, 13, 14, 15
+### Dependency Order
+1. **Foundation** (Commits 1-3): Config → Database schema → Migrations
+2. **Data Layer** (Commits 4-6): Repository implementations by domain
+3. **Business Layer** (Commits 7-8): Managers with validation logic
+4. **Service Layer** (Commit 9): gRPC server + service lifecycle
+5. **Integration** (Commits 10-11): Events + caching
+6. **Validation** (Commits 12-13): Tests + deployment
 
-**Deliverables**:
-- [ ] `internal/repository/cache/redis.go` with Redis client wrapper using CQI cache
-- [ ] `internal/repository/cache/keys.go` with key pattern constants (v1:asset:id:{uuid}, v1:asset:symbol:{symbol}:{chain}, v1:group:{id}:members, v1:flags:{id}:critical, v1:venue:{id}:symbol:{symbol})
-- [ ] CacheAsset, GetCachedAsset with 1h TTL, JSON serialization
-- [ ] CacheSymbolLookup with (symbol, chain_id) → asset_id list, 1h TTL
-- [ ] CacheGroupMembers with group_id → asset_id set, 30m TTL
-- [ ] CacheCriticalFlags with asset_id → flag count, 5m TTL
-- [ ] CacheVenueSymbol with (venue_id, symbol) → asset_id, 1h TTL
-- [ ] Cache invalidation on Create/Update: explicit DEL, write-through pattern
-- [ ] Repository layer integration: check cache → miss → query DB → cache result
+### Key Integration Points
+- **CQC**: All protobuf types imported from `github.com/Combine-Capital/cqc/gen/go/cqc/*`
+- **CQI Database**: Connection pooling, transaction helpers via `cqi.Database`
+- **CQI Cache**: Redis with automatic protobuf serialization via `cqi.Cache`
+- **CQI Event Bus**: NATS JetStream publishing via `cqi.EventBus`
+- **CQI Service**: Lifecycle management via `cqi.Service` interface
 
-**Success**:
-- GetAsset(cached-id) returns <10ms (p50 target met)
-- GetVenueSymbol(cached) returns <5ms (cqmd requirement)
-- ListQualityFlags(cached, CRITICAL) returns <5ms (cqex pre-trade check)
-- UpdateAsset invalidates cache, subsequent GetAsset fetches fresh data
-- Cache keys include v1 prefix for migration support
+### Performance Validation
+- **<10ms p50** symbol resolution: Validate with cache hits in Commit 11
+- **<50ms p99** symbol resolution: Validate with integration tests in Commit 12
+- **<20ms p99** asset lookup: Validate with cache miss scenarios in Commit 12
+- **99.9% uptime**: Validate health checks and graceful shutdown in Commit 9
 
----
-
-### Commit 17: Integration Tests & Fixtures
-
-**Goal**: Create end-to-end integration tests validating all user flows.
-**Depends**: All previous commits
-
-**Deliverables**:
-- [ ] `test/integration/asset_test.go` testing asset lifecycle (create → get → update → search → delete)
-- [ ] `test/integration/deployment_test.go` testing multi-chain deployments and address lookups
-- [ ] `test/integration/relationship_test.go` testing relationship establishment and group aggregation
-- [ ] `test/integration/quality_test.go` testing flag lifecycle and severity filtering
-- [ ] `test/fixtures.go` with test data builders (NewTestAsset, NewTestDeployment, NewTestGroup)
-- [ ] `test/testdata/schema.sql` with test database schema
-- [ ] `test/testdata/seed.sql` with seed data (BTC, ETH, USDC assets; ethereum, arbitrum chains; binance, coinbase venues)
-- [ ] Integration tests use real PostgreSQL/Redis (Docker Compose), no mocks
-- [ ] Tests validate BRIEF user persona flows: portfolio aggregation, symbol resolution, pre-trade checks
-
-**Success**:
-- Portfolio Manager flow: GetAssetGroup("ETH") → ListAssetRelationships → aggregate variants succeeds <100ms
-- Market Data flow: GetVenueSymbol("binance", "BTCUSDT") → GetAsset → returns canonical asset <10ms from cache
-- Exchange flow: ListQualityFlags(asset-id, CRITICAL) → blocks trade if flags exist <5ms
-- All integration tests pass with real infrastructure
-- Tests seed relationships before aggregation queries (prevents flaky tests)
-
----
-
-### Commit 18: Performance Optimization & Documentation
-
-**Goal**: Validate performance targets and complete production documentation.
-**Depends**: Commits 16, 17
-
-**Deliverables**:
-- [ ] Performance benchmarks validating <50ms p99, <10ms p50 for symbol resolution
-- [ ] Load testing script validating performance under concurrent requests
-- [ ] Query optimization: EXPLAIN ANALYZE for slow queries, add missing indexes if needed
-- [ ] Connection pool tuning (pgxpool max_conns, Redis pool size)
-- [ ] `README.md` with architecture diagram, setup guide, API examples
-- [ ] API documentation extracted from CQC proto comments
-- [ ] Observability: CQI metrics integration (request latency, error rates, cache hit ratio)
-- [ ] Runbook with deployment steps, rollback procedures, troubleshooting
-- [ ] Update `docs/SPEC.md` with any deviations discovered during implementation
-
-**Success**:
-- SearchAssets("USDC") p99 <50ms, p50 <10ms (measured via benchmarks)
-- GetVenueSymbol from cache p99 <10ms, p50 <5ms (cqmd requirement met)
-- Cache hit ratio >80% for asset lookups after warmup
-- All 6 success metrics from BRIEF validated
-- Documentation enables new developer to run service locally in <30min
-- Load test sustains performance targets under concurrent load
+### Testing Strategy
+- **Unit Tests**: Repository and Manager layers (Commits 4-8)
+- **Integration Tests**: Full workflows with real infrastructure (Commit 12)
+- **Performance Tests**: Cache latency, database query latency (Commit 12)
+- **E2E Tests**: User persona workflows (cqmd, cqpm, cqvx) (Commit 12)
