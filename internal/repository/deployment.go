@@ -6,6 +6,7 @@ import (
 	"time"
 
 	assetsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/assets/v1"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -47,12 +48,27 @@ func (r *PostgresRepository) CreateAssetDeployment(ctx context.Context, deployme
 
 	query := `
 		INSERT INTO deployments (
-			id, asset_id, chain_id, contract_address, decimals, is_canonical,
-			deployment_block, deployer_address, created_at, updated_at
+			id, asset_id, chain_id, address, decimals, 
+			chain_name, deployed_at, metadata,
+			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 		)
 	`
+
+	var deployedAt interface{}
+	if deployment.DeployedAt != nil {
+		deployedAt = deployment.DeployedAt.AsTime()
+	}
+
+	var metadata interface{}
+	if deployment.Metadata != nil {
+		metadataJSON, err := deployment.Metadata.MarshalJSON()
+		if err != nil {
+			return fmt.Errorf("marshal metadata: %w", err)
+		}
+		metadata = metadataJSON
+	}
 
 	_, err = r.exec(ctx, query,
 		deployment.GetDeploymentId(),
@@ -60,9 +76,9 @@ func (r *PostgresRepository) CreateAssetDeployment(ctx context.Context, deployme
 		deployment.GetChainId(),
 		deployment.GetAddress(),
 		deployment.GetDecimals(),
-		deployment.GetIsCanonical(),
-		nullableInt64(deployment.DeploymentBlock),
-		nullableString(deployment.DeployerAddress),
+		deployment.ChainName,
+		deployedAt,
+		metadata,
 		deployment.CreatedAt.AsTime(),
 		deployment.UpdatedAt.AsTime(),
 	)
@@ -78,28 +94,29 @@ func (r *PostgresRepository) CreateAssetDeployment(ctx context.Context, deployme
 func (r *PostgresRepository) GetAssetDeployment(ctx context.Context, id string) (*assetsv1.AssetDeployment, error) {
 	query := `
 		SELECT
-			id, asset_id, chain_id, contract_address, decimals, is_canonical,
-			deployment_block, deployer_address, created_at, updated_at
+			id, asset_id, chain_id, address, decimals,
+			chain_name, deployed_at, metadata,
+			created_at, updated_at
 		FROM deployments
 		WHERE id = $1
 	`
 
-	var deploymentId, assetId, chainId, contractAddress string
+	var deploymentId, assetId, chainId, address string
 	var decimals int32
-	var isCanonical bool
-	var deploymentBlock *int64
-	var deployerAddress *string
+	var chainName *string
+	var deployedAt *time.Time
+	var metadataJSON []byte
 	var createdAt, updatedAt time.Time
 
 	err := r.queryRow(ctx, query, id).Scan(
 		&deploymentId,
 		&assetId,
 		&chainId,
-		&contractAddress,
+		&address,
 		&decimals,
-		&isCanonical,
-		&deploymentBlock,
-		&deployerAddress,
+		&chainName,
+		&deployedAt,
+		&metadataJSON,
 		&createdAt,
 		&updatedAt,
 	)
@@ -109,16 +126,26 @@ func (r *PostgresRepository) GetAssetDeployment(ctx context.Context, id string) 
 	}
 
 	deployment := &assetsv1.AssetDeployment{
-		DeploymentId:    &deploymentId,
-		AssetId:         &assetId,
-		ChainId:         &chainId,
-		Address:         &contractAddress,
-		Decimals:        &decimals,
-		IsCanonical:     &isCanonical,
-		DeploymentBlock: deploymentBlock,
-		DeployerAddress: deployerAddress,
-		CreatedAt:       timestamppb.New(createdAt),
-		UpdatedAt:       timestamppb.New(updatedAt),
+		DeploymentId: &deploymentId,
+		AssetId:      &assetId,
+		ChainId:      &chainId,
+		Address:      &address,
+		Decimals:     &decimals,
+		ChainName:    chainName,
+		CreatedAt:    timestamppb.New(createdAt),
+		UpdatedAt:    timestamppb.New(updatedAt),
+	}
+
+	if deployedAt != nil {
+		deployment.DeployedAt = timestamppb.New(*deployedAt)
+	}
+
+	if len(metadataJSON) > 0 {
+		metadata := &structpb.Struct{}
+		if err := metadata.UnmarshalJSON(metadataJSON); err != nil {
+			return nil, fmt.Errorf("unmarshal metadata: %w", err)
+		}
+		deployment.Metadata = metadata
 	}
 
 	return deployment, nil
@@ -128,28 +155,29 @@ func (r *PostgresRepository) GetAssetDeployment(ctx context.Context, id string) 
 func (r *PostgresRepository) GetAssetDeploymentByChain(ctx context.Context, assetID, chainID string) (*assetsv1.AssetDeployment, error) {
 	query := `
 		SELECT
-			id, asset_id, chain_id, contract_address, decimals, is_canonical,
-			deployment_block, deployer_address, created_at, updated_at
+			id, asset_id, chain_id, address, decimals,
+			chain_name, deployed_at, metadata,
+			created_at, updated_at
 		FROM deployments
 		WHERE asset_id = $1 AND chain_id = $2
 	`
 
-	var deploymentId, assetId, chainId, contractAddress string
+	var deploymentId, assetId, chainId, address string
 	var decimals int32
-	var isCanonical bool
-	var deploymentBlock *int64
-	var deployerAddress *string
+	var chainName *string
+	var deployedAt *time.Time
+	var metadataJSON []byte
 	var createdAt, updatedAt time.Time
 
 	err := r.queryRow(ctx, query, assetID, chainID).Scan(
 		&deploymentId,
 		&assetId,
 		&chainId,
-		&contractAddress,
+		&address,
 		&decimals,
-		&isCanonical,
-		&deploymentBlock,
-		&deployerAddress,
+		&chainName,
+		&deployedAt,
+		&metadataJSON,
 		&createdAt,
 		&updatedAt,
 	)
@@ -159,16 +187,26 @@ func (r *PostgresRepository) GetAssetDeploymentByChain(ctx context.Context, asse
 	}
 
 	deployment := &assetsv1.AssetDeployment{
-		DeploymentId:    &deploymentId,
-		AssetId:         &assetId,
-		ChainId:         &chainId,
-		Address:         &contractAddress,
-		Decimals:        &decimals,
-		IsCanonical:     &isCanonical,
-		DeploymentBlock: deploymentBlock,
-		DeployerAddress: deployerAddress,
-		CreatedAt:       timestamppb.New(createdAt),
-		UpdatedAt:       timestamppb.New(updatedAt),
+		DeploymentId: &deploymentId,
+		AssetId:      &assetId,
+		ChainId:      &chainId,
+		Address:      &address,
+		Decimals:     &decimals,
+		ChainName:    chainName,
+		CreatedAt:    timestamppb.New(createdAt),
+		UpdatedAt:    timestamppb.New(updatedAt),
+	}
+
+	if deployedAt != nil {
+		deployment.DeployedAt = timestamppb.New(*deployedAt)
+	}
+
+	if len(metadataJSON) > 0 {
+		metadata := &structpb.Struct{}
+		if err := metadata.UnmarshalJSON(metadataJSON); err != nil {
+			return nil, fmt.Errorf("unmarshal metadata: %w", err)
+		}
+		deployment.Metadata = metadata
 	}
 
 	return deployment, nil
@@ -179,8 +217,9 @@ func (r *PostgresRepository) ListAssetDeployments(ctx context.Context, filter *D
 	// Build query with filters
 	query := `
 		SELECT
-			id, asset_id, chain_id, contract_address, decimals, is_canonical,
-			deployment_block, deployer_address, created_at, updated_at
+			id, asset_id, chain_id, address, decimals,
+			chain_name, deployed_at, metadata,
+			created_at, updated_at
 		FROM deployments
 		WHERE 1=1
 	`
@@ -198,12 +237,6 @@ func (r *PostgresRepository) ListAssetDeployments(ctx context.Context, filter *D
 		if filter.ChainID != nil {
 			query += fmt.Sprintf(" AND chain_id = $%d", argPos)
 			args = append(args, *filter.ChainID)
-			argPos++
-		}
-
-		if filter.IsCanonical != nil {
-			query += fmt.Sprintf(" AND is_canonical = $%d", argPos)
-			args = append(args, *filter.IsCanonical)
 			argPos++
 		}
 
@@ -231,22 +264,22 @@ func (r *PostgresRepository) ListAssetDeployments(ctx context.Context, filter *D
 
 	var deployments []*assetsv1.AssetDeployment
 	for rows.Next() {
-		var deploymentId, assetId, chainId, contractAddress string
+		var deploymentId, assetId, chainId, address string
 		var decimals int32
-		var isCanonical bool
-		var deploymentBlock *int64
-		var deployerAddress *string
+		var chainName *string
+		var deployedAt *time.Time
+		var metadataJSON []byte
 		var createdAt, updatedAt time.Time
 
 		err := rows.Scan(
 			&deploymentId,
 			&assetId,
 			&chainId,
-			&contractAddress,
+			&address,
 			&decimals,
-			&isCanonical,
-			&deploymentBlock,
-			&deployerAddress,
+			&chainName,
+			&deployedAt,
+			&metadataJSON,
 			&createdAt,
 			&updatedAt,
 		)
@@ -255,16 +288,26 @@ func (r *PostgresRepository) ListAssetDeployments(ctx context.Context, filter *D
 		}
 
 		deployment := &assetsv1.AssetDeployment{
-			DeploymentId:    &deploymentId,
-			AssetId:         &assetId,
-			ChainId:         &chainId,
-			Address:         &contractAddress,
-			Decimals:        &decimals,
-			IsCanonical:     &isCanonical,
-			DeploymentBlock: deploymentBlock,
-			DeployerAddress: deployerAddress,
-			CreatedAt:       timestamppb.New(createdAt),
-			UpdatedAt:       timestamppb.New(updatedAt),
+			DeploymentId: &deploymentId,
+			AssetId:      &assetId,
+			ChainId:      &chainId,
+			Address:      &address,
+			Decimals:     &decimals,
+			ChainName:    chainName,
+			CreatedAt:    timestamppb.New(createdAt),
+			UpdatedAt:    timestamppb.New(updatedAt),
+		}
+
+		if deployedAt != nil {
+			deployment.DeployedAt = timestamppb.New(*deployedAt)
+		}
+
+		if len(metadataJSON) > 0 {
+			metadata := &structpb.Struct{}
+			if err := metadata.UnmarshalJSON(metadataJSON); err != nil {
+				return nil, fmt.Errorf("unmarshal metadata: %w", err)
+			}
+			deployment.Metadata = metadata
 		}
 
 		deployments = append(deployments, deployment)

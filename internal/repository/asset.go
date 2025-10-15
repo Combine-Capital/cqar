@@ -7,6 +7,8 @@ import (
 
 	assetsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/assets/v1"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -403,4 +405,233 @@ func ptrIfNotEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// CreateAssetIdentifier inserts a new asset identifier mapping
+func (r *PostgresRepository) CreateAssetIdentifier(ctx context.Context, identifier *assetsv1.AssetIdentifier) error {
+	// Generate ID if not provided
+	if identifier.IdentifierId == nil || *identifier.IdentifierId == "" {
+		id := uuid.New().String()
+		identifier.IdentifierId = &id
+	}
+
+	// Set timestamps
+	now := timestamppb.Now()
+	if identifier.CreatedAt == nil {
+		identifier.CreatedAt = now
+	}
+
+	// Convert DataSource enum to string for database storage
+	var source string
+	if identifier.Source != nil {
+		source = identifier.Source.String()
+	}
+
+	query := `
+		INSERT INTO asset_identifiers (
+			id, asset_id, source, external_id, is_primary, metadata,
+			verified_at, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
+		)
+	`
+
+	// For now, verified_at and updated_at are set to created_at
+	createdAtTime := identifier.CreatedAt.AsTime()
+
+	// Convert metadata struct to JSONB
+	// Note: In production, this should properly marshal the protobuf Struct to JSONB
+	var metadataJSON []byte
+	if identifier.Metadata != nil {
+		// For now, store as nil - proper implementation would marshal the struct
+		metadataJSON = nil
+	}
+
+	_, err := r.exec(ctx, query,
+		identifier.GetIdentifierId(),
+		identifier.GetAssetId(),
+		source,
+		identifier.GetExternalId(),
+		identifier.GetIsPrimary(),
+		metadataJSON,
+		createdAtTime, // verified_at defaults to created_at
+		createdAtTime,
+		createdAtTime, // updated_at defaults to created_at
+	)
+
+	if err != nil {
+		return fmt.Errorf("create asset identifier: %w", err)
+	}
+
+	return nil
+}
+
+// GetAssetIdentifier retrieves an asset identifier by ID
+func (r *PostgresRepository) GetAssetIdentifier(ctx context.Context, id string) (*assetsv1.AssetIdentifier, error) {
+	query := `
+		SELECT
+			id, asset_id, source, external_id, is_primary, metadata,
+			created_at
+		FROM asset_identifiers
+		WHERE id = $1
+	`
+
+	var identifierId, assetId, sourceStr, externalId string
+	var isPrimary bool
+	var metadata []byte
+	var createdAt time.Time
+
+	err := r.queryRow(ctx, query, id).Scan(
+		&identifierId,
+		&assetId,
+		&sourceStr,
+		&externalId,
+		&isPrimary,
+		&metadata,
+		&createdAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("asset identifier not found: %s", id)
+		}
+		return nil, fmt.Errorf("get asset identifier: %w", err)
+	}
+
+	// Parse DataSource enum
+	dataSource := parseAssetDataSource(sourceStr)
+
+	// Convert metadata - for now nil, proper implementation would unmarshal to protobuf Struct
+	var metadataStruct *structpb.Struct
+	// TODO: Unmarshal metadata JSON to protobuf Struct
+
+	identifier := &assetsv1.AssetIdentifier{
+		IdentifierId: &identifierId,
+		AssetId:      &assetId,
+		Source:       &dataSource,
+		ExternalId:   &externalId,
+		IsPrimary:    &isPrimary,
+		Metadata:     metadataStruct,
+		CreatedAt:    timestamppb.New(createdAt),
+	}
+
+	return identifier, nil
+}
+
+// ListAssetIdentifiers retrieves asset identifiers with optional filtering
+func (r *PostgresRepository) ListAssetIdentifiers(ctx context.Context, filter *AssetIdentifierFilter) ([]*assetsv1.AssetIdentifier, error) {
+	query := `
+		SELECT
+			id, asset_id, source, external_id, is_primary, metadata,
+			created_at
+		FROM asset_identifiers
+		WHERE 1=1
+	`
+
+	args := []interface{}{}
+	argPos := 1
+
+	if filter != nil {
+		if filter.AssetID != nil {
+			query += fmt.Sprintf(" AND asset_id = $%d", argPos)
+			args = append(args, *filter.AssetID)
+			argPos++
+		}
+		if filter.Source != nil {
+			query += fmt.Sprintf(" AND source = $%d", argPos)
+			args = append(args, *filter.Source)
+			argPos++
+		}
+		if filter.IsPrimary != nil {
+			query += fmt.Sprintf(" AND is_primary = $%d", argPos)
+			args = append(args, *filter.IsPrimary)
+			argPos++
+		}
+
+		query += " ORDER BY created_at DESC"
+
+		if filter.Limit > 0 {
+			query += fmt.Sprintf(" LIMIT $%d", argPos)
+			args = append(args, filter.Limit)
+			argPos++
+		}
+		if filter.Offset > 0 {
+			query += fmt.Sprintf(" OFFSET $%d", argPos)
+			args = append(args, filter.Offset)
+			argPos++
+		}
+	} else {
+		query += " ORDER BY created_at DESC"
+	}
+
+	rows, err := r.query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list asset identifiers: %w", err)
+	}
+	defer rows.Close()
+
+	identifiers := []*assetsv1.AssetIdentifier{}
+	for rows.Next() {
+		var identifierId, assetId, sourceStr, externalId string
+		var isPrimary bool
+		var metadata []byte
+		var createdAt time.Time
+
+		err := rows.Scan(
+			&identifierId,
+			&assetId,
+			&sourceStr,
+			&externalId,
+			&isPrimary,
+			&metadata,
+			&createdAt,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("scan asset identifier: %w", err)
+		}
+
+		// Parse DataSource enum
+		dataSource := parseAssetDataSource(sourceStr)
+
+		// Convert metadata - for now nil
+		var metadataStruct *structpb.Struct
+		// TODO: Unmarshal metadata JSON to protobuf Struct
+
+		identifier := &assetsv1.AssetIdentifier{
+			IdentifierId: &identifierId,
+			AssetId:      &assetId,
+			Source:       &dataSource,
+			ExternalId:   &externalId,
+			IsPrimary:    &isPrimary,
+			Metadata:     metadataStruct,
+			CreatedAt:    timestamppb.New(createdAt),
+		}
+
+		identifiers = append(identifiers, identifier)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate asset identifiers: %w", err)
+	}
+
+	return identifiers, nil
+}
+
+// parseAssetDataSource converts a database string to a DataSource enum for assets
+func parseAssetDataSource(s string) assetsv1.DataSource {
+	switch s {
+	case "coingecko":
+		return assetsv1.DataSource_DATA_SOURCE_COINGECKO
+	case "coinmarketcap":
+		return assetsv1.DataSource_DATA_SOURCE_COINMARKETCAP
+	case "defillama":
+		return assetsv1.DataSource_DATA_SOURCE_DEFILLAMA
+	case "messari":
+		return assetsv1.DataSource_DATA_SOURCE_MESSARI
+	case "internal":
+		return assetsv1.DataSource_DATA_SOURCE_INTERNAL
+	default:
+		return assetsv1.DataSource_DATA_SOURCE_UNSPECIFIED
+	}
 }

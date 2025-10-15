@@ -4,6 +4,7 @@ import (
 	"context"
 
 	assetsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/assets/v1"
+	marketsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/markets/v1"
 )
 
 // Repository defines the interface for all data access operations in CQAR.
@@ -43,6 +44,29 @@ type Repository interface {
 	RemoveAssetFromGroup(ctx context.Context, groupID, assetID string) error
 	ListAssetGroups(ctx context.Context, filter *AssetGroupFilter) ([]*assetsv1.AssetGroup, error)
 
+	// Symbol operations
+	CreateSymbol(ctx context.Context, symbol *marketsv1.Symbol) error
+	GetSymbol(ctx context.Context, id string) (*marketsv1.Symbol, error)
+	UpdateSymbol(ctx context.Context, symbol *marketsv1.Symbol) error
+	DeleteSymbol(ctx context.Context, id string) error
+	ListSymbols(ctx context.Context, filter *SymbolFilter) ([]*marketsv1.Symbol, error)
+	SearchSymbols(ctx context.Context, query string, filter *SymbolFilter) ([]*marketsv1.Symbol, error)
+
+	// SymbolIdentifier operations
+	CreateSymbolIdentifier(ctx context.Context, identifier *marketsv1.SymbolIdentifier) error
+	GetSymbolIdentifier(ctx context.Context, id string) (*marketsv1.SymbolIdentifier, error)
+	ListSymbolIdentifiers(ctx context.Context, filter *SymbolIdentifierFilter) ([]*marketsv1.SymbolIdentifier, error)
+
+	// Chain operations
+	CreateChain(ctx context.Context, chain *assetsv1.Chain) error
+	GetChain(ctx context.Context, id string) (*assetsv1.Chain, error)
+	ListChains(ctx context.Context, filter *ChainFilter) ([]*assetsv1.Chain, error)
+
+	// AssetIdentifier operations
+	CreateAssetIdentifier(ctx context.Context, identifier *assetsv1.AssetIdentifier) error
+	GetAssetIdentifier(ctx context.Context, id string) (*assetsv1.AssetIdentifier, error)
+	ListAssetIdentifiers(ctx context.Context, filter *AssetIdentifierFilter) ([]*assetsv1.AssetIdentifier, error)
+
 	// Transaction support
 	WithTransaction(ctx context.Context, fn func(repo Repository) error) error
 
@@ -62,11 +86,10 @@ type AssetFilter struct {
 
 // DeploymentFilter defines filtering options for deployment queries
 type DeploymentFilter struct {
-	AssetID     *string // Filter by asset ID
-	ChainID     *string // Filter by chain ID
-	IsCanonical *bool   // Filter by canonical flag
-	Limit       int     // Maximum number of results
-	Offset      int     // Number of results to skip
+	AssetID *string // Filter by asset ID
+	ChainID *string // Filter by chain ID
+	Limit   int     // Maximum number of results
+	Offset  int     // Number of results to skip
 }
 
 // RelationshipFilter defines filtering options for relationship queries
@@ -94,4 +117,44 @@ type AssetGroupFilter struct {
 	Name   *string // Filter by group name
 	Limit  int     // Maximum number of results
 	Offset int     // Number of results to skip
+}
+
+// SymbolFilter defines filtering options for symbol queries
+type SymbolFilter struct {
+	BaseAssetID       *string // Filter by base asset ID
+	QuoteAssetID      *string // Filter by quote asset ID
+	SymbolType        *string // Filter by symbol type (SPOT, PERPETUAL, FUTURE, OPTION, MARGIN)
+	SettlementAssetID *string // Filter by settlement asset ID
+	Limit             int     // Maximum number of results
+	Offset            int     // Number of results to skip (for pagination)
+	SortBy            string  // Field to sort by (default: created_at)
+	SortOrder         string  // Sort order: ASC or DESC (default: DESC)
+}
+
+// SymbolIdentifierFilter defines filtering options for symbol identifier queries
+type SymbolIdentifierFilter struct {
+	SymbolID  *string // Filter by symbol ID
+	Source    *string // Filter by source (coingecko, coinmarketcap, etc.)
+	IsPrimary *bool   // Filter by primary flag
+	Limit     int     // Maximum number of results
+	Offset    int     // Number of results to skip
+}
+
+// ChainFilter defines filtering options for chain queries
+type ChainFilter struct {
+	ChainType     *string // Filter by chain type (EVM, COSMOS, SOLANA, etc.)
+	NativeAssetID *string // Filter by native asset ID
+	Limit         int     // Maximum number of results
+	Offset        int     // Number of results to skip
+	SortBy        string  // Field to sort by (default: created_at)
+	SortOrder     string  // Sort order: ASC or DESC (default: DESC)
+}
+
+// AssetIdentifierFilter defines filtering options for asset identifier queries
+type AssetIdentifierFilter struct {
+	AssetID   *string // Filter by asset ID
+	Source    *string // Filter by source (coingecko, coinmarketcap, etc.)
+	IsPrimary *bool   // Filter by primary flag
+	Limit     int     // Maximum number of results
+	Offset    int     // Number of results to skip
 }

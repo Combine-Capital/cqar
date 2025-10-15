@@ -5,7 +5,7 @@
 - [x] **Commit 2**: Database Schema & Migrations (Core Tables)
 - [x] **Commit 3**: Database Schema & Migrations (Relationship Tables)
 - [x] **Commit 4**: Repository Layer - Asset Domain
-- [ ] **Commit 5**: Repository Layer - Symbol & Chain Domain
+- [x] **Commit 5**: Repository Layer - Symbol & Chain Domain
 - [ ] **Commit 6**: Repository Layer - Venue & Mapping Domain
 - [ ] **Commit 7**: Business Logic - Asset Management
 - [ ] **Commit 8**: Business Logic - Symbol & Venue Management

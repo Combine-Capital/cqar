@@ -75,6 +75,7 @@ func TestMigrations_AssetsTable(t *testing.T) {
 			"description": {"text", "YES"},
 			"logo_url":    {"text", "YES"},
 			"website_url": {"text", "YES"},
+			"metadata":    {"jsonb", "YES"},
 			"created_at":  {"timestamp with time zone", "NO"},
 			"updated_at":  {"timestamp with time zone", "NO"},
 		}
@@ -542,9 +543,10 @@ func TestMigrations_DeploymentsTable(t *testing.T) {
 		expectedIndexes := []string{
 			"idx_deployments_asset_id",
 			"idx_deployments_chain_id",
-			"idx_deployments_canonical",
 			"idx_deployments_asset_chain",
 			"idx_deployments_contract_address",
+			"idx_deployments_metadata",
+			"idx_deployments_deployed_at",
 		}
 
 		for _, indexName := range expectedIndexes {
@@ -567,7 +569,7 @@ func TestMigrations_DeploymentsTable(t *testing.T) {
 		invalidAssetID := uuid.New()
 
 		_, err := db.Exec(`
-			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, created_at, updated_at)
+			INSERT INTO deployments (id, asset_id, chain_id, address, decimals, created_at, updated_at)
 			VALUES ($1, $2, $3, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, $4, $4)
 		`, deploymentID, invalidAssetID, chainID, now)
 
@@ -580,7 +582,7 @@ func TestMigrations_DeploymentsTable(t *testing.T) {
 		deploymentID2 := uuid.New()
 
 		_, err := db.Exec(`
-			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, created_at, updated_at)
+			INSERT INTO deployments (id, asset_id, chain_id, address, decimals, created_at, updated_at)
 			VALUES ($1, $2, $3, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, $4, $4)
 		`, deploymentID1, assetID, chainID, now)
 		require.NoError(t, err)
@@ -588,7 +590,7 @@ func TestMigrations_DeploymentsTable(t *testing.T) {
 
 		// Try to insert duplicate asset+chain
 		_, err = db.Exec(`
-			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, created_at, updated_at)
+			INSERT INTO deployments (id, asset_id, chain_id, address, decimals, created_at, updated_at)
 			VALUES ($1, $2, $3, '0xdifferentaddress', 6, $4, $4)
 		`, deploymentID2, assetID, chainID, now)
 		assert.Error(t, err, "Should fail with duplicate asset+chain")
@@ -604,7 +606,7 @@ func TestMigrations_DeploymentsTable(t *testing.T) {
 		defer db.Exec(`DELETE FROM chains WHERE id = $1`, chainID2)
 
 		_, err = db.Exec(`
-			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, created_at, updated_at)
+			INSERT INTO deployments (id, asset_id, chain_id, address, decimals, created_at, updated_at)
 			VALUES ($1, $2, $3, '0xtest', 100, $4, $4)
 		`, deploymentID, assetID, chainID2, now)
 		assert.Error(t, err, "Should fail with decimals > 77")
@@ -615,21 +617,19 @@ func TestMigrations_DeploymentsTable(t *testing.T) {
 		deploymentID := uuid.New()
 
 		_, err := db.Exec(`
-			INSERT INTO deployments (id, asset_id, chain_id, contract_address, decimals, is_canonical, created_at, updated_at)
-			VALUES ($1, $2, $3, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, true, $4, $4)
+			INSERT INTO deployments (id, asset_id, chain_id, address, decimals, created_at, updated_at)
+			VALUES ($1, $2, $3, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, $4, $4)
 		`, deploymentID, assetID, chainID, now)
 		require.NoError(t, err)
 		defer db.Exec(`DELETE FROM deployments WHERE id = $1`, deploymentID)
 
-		var contractAddress string
+		var address string
 		var decimals int
-		var isCanonical bool
-		err = db.QueryRow(`SELECT contract_address, decimals, is_canonical FROM deployments WHERE id = $1`, deploymentID).
-			Scan(&contractAddress, &decimals, &isCanonical)
+		err = db.QueryRow(`SELECT address, decimals FROM deployments WHERE id = $1`, deploymentID).
+			Scan(&address, &decimals)
 		require.NoError(t, err)
-		assert.Equal(t, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", contractAddress)
+		assert.Equal(t, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", address)
 		assert.Equal(t, 6, decimals)
-		assert.True(t, isCanonical)
 	})
 }
 
