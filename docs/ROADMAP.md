@@ -4,7 +4,7 @@
 - [x] **Commit 1**: Project Foundation & Configuration
 - [x] **Commit 2**: Database Schema & Migrations (Core Tables)
 - [x] **Commit 3**: Database Schema & Migrations (Relationship Tables)
-- [ ] **Commit 4**: Repository Layer - Asset Domain
+- [x] **Commit 4**: Repository Layer - Asset Domain
 - [ ] **Commit 5**: Repository Layer - Symbol & Chain Domain
 - [ ] **Commit 6**: Repository Layer - Venue & Mapping Domain
 - [ ] **Commit 7**: Business Logic - Asset Management
@@ -25,13 +25,13 @@
 **Depends**: none
 
 **Deliverables**:
-- [ ] `go.mod` with CQC (github.com/Combine-Capital/cqc) and CQI (github.com/Combine-Capital/cqi) dependencies
-- [ ] `cmd/server/main.go` skeleton with CQI bootstrap initialization
-- [ ] `internal/config/config.go` extending CQI config types with CQAR-specific settings
-- [ ] `config.yaml`, `config.dev.yaml`, `config.prod.yaml` with database, cache, event bus configuration
-- [ ] `Makefile` with build, test, run, migrate targets
-- [ ] `.gitignore` excluding binaries, vendor, IDE files
-- [ ] `README.md` with service overview and setup instructions
+- [x] `go.mod` with CQC (github.com/Combine-Capital/cqc) and CQI (github.com/Combine-Capital/cqi) dependencies
+- [x] `cmd/server/main.go` skeleton with CQI bootstrap initialization
+- [x] `internal/config/config.go` extending CQI config types with CQAR-specific settings
+- [x] `config.yaml`, `config.dev.yaml`, `config.prod.yaml` with database, cache, event bus configuration
+- [x] `Makefile` with build, test, run, migrate targets
+- [x] `.gitignore` excluding binaries, vendor, IDE files
+- [x] `README.md` with service overview and setup instructions
 
 **Success**:
 - `go mod tidy` resolves all dependencies without errors
@@ -46,12 +46,12 @@
 **Depends**: Commit 1
 
 **Deliverables**:
-- [ ] `migrations/000001_create_assets_table.up.sql` with assets table (id, symbol, name, type, category, metadata fields, timestamps)
-- [ ] `migrations/000001_create_assets_table.down.sql` with DROP TABLE assets
-- [ ] `migrations/000002_create_symbols_table.up.sql` with symbols table (id, base/quote/settlement asset FKs, type, market specs, option fields)
-- [ ] `migrations/000003_create_chains_table.up.sql` with chains table (id, name, type, native_asset_id FK, rpc_urls array, explorer_url)
-- [ ] `migrations/000004_create_venues_table.up.sql` with venues table (id, name, type, chain_id FK, metadata, is_active)
-- [ ] All indexes: idx_assets_symbol, idx_assets_type, idx_symbols_base_asset, idx_symbols_quote_asset, idx_venues_type
+- [x] `migrations/000001_create_assets_table.up.sql` with assets table (id, symbol, name, type, category, metadata fields, timestamps)
+- [x] `migrations/000001_create_assets_table.down.sql` with DROP TABLE assets
+- [x] `migrations/000002_create_symbols_table.up.sql` with symbols table (id, base/quote/settlement asset FKs, type, market specs, option fields)
+- [x] `migrations/000003_create_chains_table.up.sql` with chains table (id, name, type, native_asset_id FK, rpc_urls array, explorer_url)
+- [x] `migrations/000004_create_venues_table.up.sql` with venues table (id, name, type, chain_id FK, metadata, is_active)
+- [x] All indexes: idx_assets_symbol, idx_assets_type, idx_symbols_base_asset, idx_symbols_quote_asset, idx_venues_type
 
 **Success**:
 - `make migrate-up` executes migrations against PostgreSQL without errors
@@ -66,15 +66,15 @@
 **Depends**: Commit 2
 
 **Deliverables**:
-- [ ] `migrations/000005_create_deployments_table.up.sql` with deployments table (asset_id FK, chain_id, contract_address, decimals, is_canonical)
-- [ ] `migrations/000006_create_relationships_table.up.sql` with relationships table (from/to asset_id FKs, type, conversion_rate, protocol)
-- [ ] `migrations/000007_create_quality_flags_table.up.sql` with quality_flags table (asset_id FK, type, severity, source, reason, timestamps)
-- [ ] `migrations/000008_create_asset_groups_table.up.sql` with asset_groups and group_members tables
-- [ ] `migrations/000009_create_asset_identifiers_table.up.sql` with asset_identifiers table (asset_id FK, source, external_id, is_primary)
-- [ ] `migrations/000010_create_symbol_identifiers_table.up.sql` with symbol_identifiers table (symbol_id FK, source, external_id, is_primary)
-- [ ] `migrations/000011_create_venue_assets_table.up.sql` with venue_assets table (venue_id/asset_id FKs, venue_symbol, availability flags, fees)
-- [ ] `migrations/000012_create_venue_symbols_table.up.sql` with venue_symbols table (venue_id/symbol_id FKs, venue_symbol, fees, status)
-- [ ] All composite unique constraints and indexes
+- [x] `migrations/000005_create_deployments_table.up.sql` with deployments table (asset_id FK, chain_id, contract_address, decimals, is_canonical)
+- [x] `migrations/000006_create_relationships_table.up.sql` with relationships table (from/to asset_id FKs, type, conversion_rate, protocol)
+- [x] `migrations/000007_create_quality_flags_table.up.sql` with quality_flags table (asset_id FK, type, severity, source, reason, timestamps)
+- [x] `migrations/000008_create_asset_groups_table.up.sql` with asset_groups and group_members tables
+- [x] `migrations/000009_create_asset_identifiers_table.up.sql` with asset_identifiers table (asset_id FK, source, external_id, is_primary)
+- [x] `migrations/000010_create_symbol_identifiers_table.up.sql` with symbol_identifiers table (symbol_id FK, source, external_id, is_primary)
+- [x] `migrations/000011_create_venue_assets_table.up.sql` with venue_assets table (venue_id/asset_id FKs, venue_symbol, availability flags, fees)
+- [x] `migrations/000012_create_venue_symbols_table.up.sql` with venue_symbols table (venue_id/symbol_id FKs, venue_symbol, fees, status)
+- [x] All composite unique constraints and indexes
 
 **Success**:
 - `make migrate-up` applies all 12 migrations successfully
@@ -89,15 +89,15 @@
 **Depends**: Commit 3
 
 **Deliverables**:
-- [ ] `internal/repository/repository.go` defining Repository interface with all CRUD method signatures
-- [ ] `internal/repository/postgres.go` implementing PostgreSQL connection via CQI database package
-- [ ] `internal/repository/asset.go` with CreateAsset, GetAsset, UpdateAsset, DeleteAsset, ListAssets, SearchAssets
-- [ ] `internal/repository/deployment.go` with CreateAssetDeployment, GetAssetDeployment, ListAssetDeployments (by asset, by chain)
-- [ ] `internal/repository/relationship.go` with CreateAssetRelationship, ListAssetRelationships (by asset, by type)
-- [ ] `internal/repository/quality_flag.go` with RaiseQualityFlag, ResolveQualityFlag, ListQualityFlags (by asset, by severity)
-- [ ] `internal/repository/asset_group.go` with CreateAssetGroup, GetAssetGroup, AddAssetToGroup, RemoveAssetFromGroup
-- [ ] All methods return CQC protobuf types (Asset, AssetDeployment, AssetRelationship, QualityFlag)
-- [ ] Transaction helpers using CQI WithTransaction for multi-table operations
+- [x] `internal/repository/repository.go` defining Repository interface with all CRUD method signatures
+- [x] `internal/repository/postgres.go` implementing PostgreSQL connection via CQI database package
+- [x] `internal/repository/asset.go` with CreateAsset, GetAsset, UpdateAsset, DeleteAsset, ListAssets, SearchAssets
+- [x] `internal/repository/deployment.go` with CreateAssetDeployment, GetAssetDeployment, ListAssetDeployments (by asset, by chain)
+- [x] `internal/repository/relationship.go` with CreateAssetRelationship, ListAssetRelationships (by asset, by type)
+- [x] `internal/repository/quality_flag.go` with RaiseQualityFlag, ResolveQualityFlag, ListQualityFlags (by asset, by severity)
+- [x] `internal/repository/asset_group.go` with CreateAssetGroup, GetAssetGroup, AddAssetToGroup, RemoveAssetFromGroup
+- [x] All methods return CQC protobuf types (Asset, AssetDeployment, AssetRelationship, QualityFlag)
+- [x] Transaction helpers using CQI WithTransaction for multi-table operations
 
 **Success**:
 - Unit tests pass: Create asset → GetAsset returns same data
