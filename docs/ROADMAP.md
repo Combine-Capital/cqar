@@ -6,7 +6,7 @@
 - [x] **Commit 3**: Database Schema & Migrations (Relationship Tables)
 - [x] **Commit 4**: Repository Layer - Asset Domain
 - [x] **Commit 5**: Repository Layer - Symbol & Chain Domain
-- [ ] **Commit 6**: Repository Layer - Venue & Mapping Domain
+- [x] **Commit 6**: Repository Layer - Venue & Mapping Domain
 - [ ] **Commit 7**: Business Logic - Asset Management
 - [ ] **Commit 8**: Business Logic - Symbol & Venue Management
 - [ ] **Commit 9**: gRPC Server & Service Integration
@@ -135,13 +135,13 @@
 **Depends**: Commit 3
 
 **Deliverables**:
-- [ ] `internal/repository/venue.go` with CreateVenue, GetVenue, ListVenues
-- [ ] `internal/repository/venue_asset.go` with CreateVenueAsset, GetVenueAsset, ListVenueAssets (by venue, by asset)
-- [ ] `internal/repository/venue_asset.go` queries "which venues trade BTC?" and "which assets on Binance?"
-- [ ] `internal/repository/venue_symbol.go` with CreateVenueSymbol, GetVenueSymbol, ListVenueSymbols (by venue, by symbol, by venue_symbol string)
-- [ ] `internal/repository/venue_symbol.go` implements GetVenueSymbol(venue_id, venue_symbol) for cqmd use case
-- [ ] All methods return CQC protobuf types (Venue, VenueAsset, VenueSymbol)
-- [ ] Composite queries join venue_symbols with symbols to return enriched VenueSymbol + Symbol data
+- [x] `internal/repository/venue.go` with CreateVenue, GetVenue, ListVenues
+- [x] `internal/repository/venue_asset.go` with CreateVenueAsset, GetVenueAsset, ListVenueAssets (by venue, by asset)
+- [x] `internal/repository/venue_asset.go` queries "which venues trade BTC?" and "which assets on Binance?"
+- [x] `internal/repository/venue_symbol.go` with CreateVenueSymbol, GetVenueSymbol, ListVenueSymbols (by venue, by symbol, by venue_symbol string)
+- [x] `internal/repository/venue_symbol.go` implements GetVenueSymbol(venue_id, venue_symbol) for cqmd use case
+- [x] All methods return CQC protobuf types (Venue, VenueAsset, VenueSymbol)
+- [x] Composite queries join venue_symbols with symbols to return enriched VenueSymbol + Symbol data
 
 **Success**:
 - CreateVenueAsset with deposit_enabled=true sets flag correctly

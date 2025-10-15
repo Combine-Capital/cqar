@@ -5,6 +5,7 @@ import (
 
 	assetsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/assets/v1"
 	marketsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/markets/v1"
+	venuesv1 "github.com/Combine-Capital/cqc/gen/go/cqc/venues/v1"
 )
 
 // Repository defines the interface for all data access operations in CQAR.
@@ -61,6 +62,23 @@ type Repository interface {
 	CreateChain(ctx context.Context, chain *assetsv1.Chain) error
 	GetChain(ctx context.Context, id string) (*assetsv1.Chain, error)
 	ListChains(ctx context.Context, filter *ChainFilter) ([]*assetsv1.Chain, error)
+
+	// Venue operations
+	CreateVenue(ctx context.Context, venue *venuesv1.Venue) error
+	GetVenue(ctx context.Context, id string) (*venuesv1.Venue, error)
+	ListVenues(ctx context.Context, filter *VenueFilter) ([]*venuesv1.Venue, error)
+
+	// VenueAsset operations
+	CreateVenueAsset(ctx context.Context, venueAsset *venuesv1.VenueAsset) error
+	GetVenueAsset(ctx context.Context, venueID, assetID string) (*venuesv1.VenueAsset, error)
+	ListVenueAssets(ctx context.Context, filter *VenueAssetFilter) ([]*venuesv1.VenueAsset, error)
+
+	// VenueSymbol operations
+	CreateVenueSymbol(ctx context.Context, venueSymbol *venuesv1.VenueSymbol) error
+	GetVenueSymbol(ctx context.Context, venueID, venueSymbol string) (*venuesv1.VenueSymbol, error)
+	GetVenueSymbolByID(ctx context.Context, venueID, symbolID string) (*venuesv1.VenueSymbol, error)
+	ListVenueSymbols(ctx context.Context, filter *VenueSymbolFilter) ([]*venuesv1.VenueSymbol, error)
+	GetVenueSymbolEnriched(ctx context.Context, venueID, venueSymbol string) (*venuesv1.VenueSymbol, *marketsv1.Symbol, error)
 
 	// AssetIdentifier operations
 	CreateAssetIdentifier(ctx context.Context, identifier *assetsv1.AssetIdentifier) error
@@ -157,4 +175,34 @@ type AssetIdentifierFilter struct {
 	IsPrimary *bool   // Filter by primary flag
 	Limit     int     // Maximum number of results
 	Offset    int     // Number of results to skip
+}
+
+// VenueFilter defines filtering options for venue queries
+type VenueFilter struct {
+	VenueType *string // Filter by venue type (CEX, DEX, DEX_AGGREGATOR, BRIDGE, LENDING)
+	ChainID   *string // Filter by chain ID (for DEX/Bridge venues)
+	IsActive  *bool   // Filter by active status
+	Limit     int     // Maximum number of results
+	Offset    int     // Number of results to skip
+	SortBy    string  // Field to sort by (default: created_at)
+	SortOrder string  // Sort order: ASC or DESC (default: DESC)
+}
+
+// VenueAssetFilter defines filtering options for venue asset queries
+type VenueAssetFilter struct {
+	VenueID        *string // Filter by venue ID (e.g., "which assets on Binance?")
+	AssetID        *string // Filter by asset ID (e.g., "which venues trade BTC?")
+	IsActive       *bool   // Filter by active status
+	TradingEnabled *bool   // Filter by trading enabled flag
+	Limit          int     // Maximum number of results
+	Offset         int     // Number of results to skip
+}
+
+// VenueSymbolFilter defines filtering options for venue symbol queries
+type VenueSymbolFilter struct {
+	VenueID  *string // Filter by venue ID
+	SymbolID *string // Filter by canonical symbol ID
+	IsActive *bool   // Filter by active status
+	Limit    int     // Maximum number of results
+	Offset   int     // Number of results to skip
 }
