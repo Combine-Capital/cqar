@@ -5,8 +5,8 @@ go 1.24.0
 toolchain go1.24.9
 
 require (
-	github.com/Combine-Capital/cqc v0.3.0
-	github.com/Combine-Capital/cqi v0.1.0
+	github.com/Combine-Capital/cqc v0.3.1
+	github.com/Combine-Capital/cqi v0.2.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/lib/pq v1.10.9
