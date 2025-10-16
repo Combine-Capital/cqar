@@ -11,6 +11,7 @@ import (
 
 	"github.com/Combine-Capital/cqar/internal/bootstrap"
 	"github.com/Combine-Capital/cqar/internal/bootstrap/client"
+	"github.com/Combine-Capital/cqar/internal/bootstrap/seeder"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -78,17 +79,99 @@ func main() {
 		Str("cqar_endpoint", cfg.CQAR.GRPCEndpoint).
 		Msg("API clients initialized successfully")
 
-	// Display help if requested
-	if len(os.Args) == 1 {
-		displayHelp()
-		return
+	// Run seeding process
+	if err := runSeeding(ctx, clients, cfg); err != nil {
+		log.Fatal().Err(err).Msg("Seeding failed")
 	}
 
-	log.Info().Msg("Bootstrap tool initialized successfully")
-	log.Info().Msg("Ready to seed data (to be implemented in Commit 15)")
+	log.Info().Msg("Bootstrap completed successfully")
+}
 
-	if *dryRun {
-		log.Info().Msg("Dry run mode: no entities will be created")
+// runSeeding executes the seeding workflow: chains -> assets
+func runSeeding(ctx context.Context, clients *Clients, cfg *bootstrap.Config) error {
+	// Step 1: Seed chains
+	log.Info().Msg("=== Step 1: Seeding Chains ===")
+	chainSeeder := seeder.NewChainSeeder(clients.CQAR, *dryRun)
+	chainResult, err := chainSeeder.SeedChains(ctx)
+	if err != nil {
+		return fmt.Errorf("seed chains: %w", err)
+	}
+
+	logSeedResult("Chains", chainResult)
+
+	// Step 2: Seed assets
+	log.Info().Msg("=== Step 2: Seeding Assets ===")
+	assetSeeder := seeder.NewAssetSeeder(clients.CoinGecko, clients.CQAR, *dryRun, *limit)
+	assetResult, err := assetSeeder.SeedAssets(ctx)
+	if err != nil {
+		return fmt.Errorf("seed assets: %w", err)
+	}
+
+	logSeedResult("Assets", assetResult)
+
+	// Step 3: Summary
+	log.Info().Msg("=== Bootstrap Summary ===")
+	log.Info().
+		Int("chains_processed", chainResult.TotalProcessed).
+		Int("chains_succeeded", chainResult.Succeeded).
+		Int("chains_failed", chainResult.Failed).
+		Int("chains_skipped", chainResult.Skipped).
+		Int("assets_processed", assetResult.TotalProcessed).
+		Int("assets_succeeded", assetResult.Succeeded).
+		Int("assets_failed", assetResult.Failed).
+		Int("assets_skipped", assetResult.Skipped).
+		Msg("Bootstrap complete")
+
+	return nil
+}
+
+// logSeedResult logs detailed seeding results
+func logSeedResult(entityType string, result *bootstrap.SeedResult) {
+	log.Info().
+		Str("entity_type", entityType).
+		Int("total", result.TotalProcessed).
+		Int("succeeded", result.Succeeded).
+		Int("failed", result.Failed).
+		Int("skipped", result.Skipped).
+		Msg("Seeding results")
+
+	// Log failures
+	if len(result.Errors) > 0 {
+		log.Warn().
+			Int("count", len(result.Errors)).
+			Msg("Failed entities")
+		for i, err := range result.Errors {
+			if i >= 10 {
+				log.Warn().
+					Int("remaining", len(result.Errors)-10).
+					Msg("... and more failures (showing first 10)")
+				break
+			}
+			log.Error().
+				Str("entity", err.Entity).
+				Str("reason", err.Reason).
+				Err(err.Error).
+				Msg("Seed failure")
+		}
+	}
+
+	// Log skipped entities
+	if len(result.SkippedReasons) > 0 {
+		log.Info().
+			Int("count", len(result.SkippedReasons)).
+			Msg("Skipped entities")
+		for i, skip := range result.SkippedReasons {
+			if i >= 10 {
+				log.Info().
+					Int("remaining", len(result.SkippedReasons)-10).
+					Msg("... and more skipped (showing first 10)")
+				break
+			}
+			log.Debug().
+				Str("entity", skip.Entity).
+				Str("reason", skip.Reason).
+				Msg("Skipped")
+		}
 	}
 }
 

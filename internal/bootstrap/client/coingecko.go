@@ -54,8 +54,8 @@ type AssetImage struct {
 
 // AssetLinks contains asset-related links
 type AssetLinks struct {
-	Homepage   []string            `json:"homepage"`
-	Blockchain map[string][]string `json:"blockchain_site"`
+	Homepage   []string `json:"homepage"`
+	Blockchain []string `json:"blockchain_site"` // Changed to array to match API response
 }
 
 // AssetMarketData contains market-related data

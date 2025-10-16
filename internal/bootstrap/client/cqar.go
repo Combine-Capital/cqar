@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // CQARClient is a wrapper around the CQAR gRPC client for bootstrap operations
@@ -26,11 +27,14 @@ func NewCQARClient(ctx context.Context, endpoint string) (*CQARClient, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	// Note: Using insecure credentials for local development
+	// In production, add API key via metadata interceptor
 	conn, err := grpc.DialContext(
 		ctx,
 		endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(), // Wait for connection
+		grpc.WithUnaryInterceptor(authInterceptor()), // Add auth header
 	)
 	if err != nil {
 		return nil, fmt.Errorf("dial CQAR gRPC: %w", err)
@@ -44,6 +48,22 @@ func NewCQARClient(ctx context.Context, endpoint string) (*CQARClient, error) {
 		conn:   conn,
 		client: client,
 	}, nil
+}
+
+// authInterceptor adds authorization header to all gRPC requests
+func authInterceptor() grpc.UnaryClientInterceptor {
+	return func(
+		ctx context.Context,
+		method string,
+		req, reply interface{},
+		cc *grpc.ClientConn,
+		invoker grpc.UnaryInvoker,
+		opts ...grpc.CallOption,
+	) error {
+		// Add authorization header with dev API key (matches config.yaml auth.api_keys)
+		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer dev_key_cqmd_12345")
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
 }
 
 // Close closes the gRPC connection
