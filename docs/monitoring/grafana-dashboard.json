@@ -1,0 +1,549 @@
+{
+    "dashboard": {
+        "title": "CQAR - Crypto Quant Asset Registry",
+        "tags": [
+            "cqar",
+            "grpc",
+            "asset-registry"
+        ],
+        "timezone": "browser",
+        "schemaVersion": 27,
+        "version": 1,
+        "refresh": "30s",
+        "time": {
+            "from": "now-1h",
+            "to": "now"
+        },
+        "panels": [
+            {
+                "id": 1,
+                "title": "Request Rate (req/s)",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 0
+                },
+                "targets": [
+                    {
+                        "expr": "sum(rate(cqar_grpc_calls_total[5m])) by (method)",
+                        "legendFormat": "{{method}}",
+                        "refId": "A"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "reqps",
+                        "label": "Requests/sec"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ]
+            },
+            {
+                "id": 2,
+                "title": "Error Rate (%)",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 0
+                },
+                "targets": [
+                    {
+                        "expr": "sum(rate(cqar_grpc_calls_total{status_code!=\"OK\"}[5m])) / sum(rate(cqar_grpc_calls_total[5m])) * 100",
+                        "legendFormat": "Error Rate",
+                        "refId": "A"
+                    }
+                ],
+                "alert": {
+                    "conditions": [
+                        {
+                            "evaluator": {
+                                "params": [
+                                    1
+                                ],
+                                "type": "gt"
+                            },
+                            "operator": {
+                                "type": "and"
+                            },
+                            "query": {
+                                "params": [
+                                    "A",
+                                    "5m",
+                                    "now"
+                                ]
+                            },
+                            "reducer": {
+                                "params": [],
+                                "type": "avg"
+                            },
+                            "type": "query"
+                        }
+                    ],
+                    "executionErrorState": "alerting",
+                    "frequency": "1m",
+                    "handler": 1,
+                    "name": "High Error Rate",
+                    "noDataState": "no_data",
+                    "notifications": []
+                },
+                "yaxes": [
+                    {
+                        "format": "percent",
+                        "label": "Error Rate"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ],
+                "thresholds": [
+                    {
+                        "value": 1,
+                        "colorMode": "critical",
+                        "op": "gt",
+                        "fill": true,
+                        "line": true
+                    }
+                ]
+            },
+            {
+                "id": 3,
+                "title": "Request Latency (p50, p90, p99)",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 8
+                },
+                "targets": [
+                    {
+                        "expr": "histogram_quantile(0.50, sum(rate(cqar_grpc_call_duration_seconds_bucket[5m])) by (method, le))",
+                        "legendFormat": "{{method}} p50",
+                        "refId": "A"
+                    },
+                    {
+                        "expr": "histogram_quantile(0.90, sum(rate(cqar_grpc_call_duration_seconds_bucket[5m])) by (method, le))",
+                        "legendFormat": "{{method}} p90",
+                        "refId": "B"
+                    },
+                    {
+                        "expr": "histogram_quantile(0.99, sum(rate(cqar_grpc_call_duration_seconds_bucket[5m])) by (method, le))",
+                        "legendFormat": "{{method}} p99",
+                        "refId": "C"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "s",
+                        "label": "Latency"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ],
+                "thresholds": [
+                    {
+                        "value": 0.050,
+                        "colorMode": "warning",
+                        "op": "gt",
+                        "fill": false,
+                        "line": true
+                    }
+                ]
+            },
+            {
+                "id": 4,
+                "title": "Cache Hit Rate (%)",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 8
+                },
+                "targets": [
+                    {
+                        "expr": "sum(rate(cqar_cache_hit_total[5m])) by (entity) / (sum(rate(cqar_cache_hit_total[5m])) by (entity) + sum(rate(cqar_cache_miss_total[5m])) by (entity)) * 100",
+                        "legendFormat": "{{entity}}",
+                        "refId": "A"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "percent",
+                        "label": "Hit Rate",
+                        "max": 100,
+                        "min": 0
+                    },
+                    {
+                        "format": "short"
+                    }
+                ],
+                "thresholds": [
+                    {
+                        "value": 70,
+                        "colorMode": "critical",
+                        "op": "lt",
+                        "fill": true,
+                        "line": true
+                    }
+                ]
+            },
+            {
+                "id": 5,
+                "title": "Top Methods by Call Volume",
+                "type": "table",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 16
+                },
+                "targets": [
+                    {
+                        "expr": "topk(10, sum by (method) (rate(cqar_grpc_calls_total[5m])))",
+                        "format": "table",
+                        "instant": true,
+                        "refId": "A"
+                    }
+                ],
+                "transformations": [
+                    {
+                        "id": "organize",
+                        "options": {
+                            "excludeByName": {
+                                "Time": true
+                            },
+                            "indexByName": {
+                                "method": 0,
+                                "Value": 1
+                            },
+                            "renameByName": {
+                                "method": "Method",
+                                "Value": "Requests/sec"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "id": 6,
+                "title": "Top Methods by Error Rate",
+                "type": "table",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 16
+                },
+                "targets": [
+                    {
+                        "expr": "topk(10, sum by (method) (rate(cqar_grpc_calls_total{status_code!=\"OK\"}[5m])))",
+                        "format": "table",
+                        "instant": true,
+                        "refId": "A"
+                    }
+                ],
+                "transformations": [
+                    {
+                        "id": "organize",
+                        "options": {
+                            "excludeByName": {
+                                "Time": true
+                            },
+                            "indexByName": {
+                                "method": 0,
+                                "Value": 1
+                            },
+                            "renameByName": {
+                                "method": "Method",
+                                "Value": "Errors/sec"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "id": 7,
+                "title": "Database Query Latency (p99)",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 24
+                },
+                "targets": [
+                    {
+                        "expr": "histogram_quantile(0.99, sum(rate(cqar_db_query_duration_seconds_bucket[5m])) by (operation, le))",
+                        "legendFormat": "{{operation}}",
+                        "refId": "A"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "s",
+                        "label": "Latency"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ],
+                "thresholds": [
+                    {
+                        "value": 0.100,
+                        "colorMode": "warning",
+                        "op": "gt",
+                        "fill": false,
+                        "line": true
+                    }
+                ]
+            },
+            {
+                "id": 8,
+                "title": "Database Connection Pool",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 24
+                },
+                "targets": [
+                    {
+                        "expr": "cqar_db_pool_active_connections",
+                        "legendFormat": "Active Connections",
+                        "refId": "A"
+                    },
+                    {
+                        "expr": "cqar_db_pool_idle_connections",
+                        "legendFormat": "Idle Connections",
+                        "refId": "B"
+                    },
+                    {
+                        "expr": "cqar_db_pool_max_connections",
+                        "legendFormat": "Max Connections",
+                        "refId": "C"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "short",
+                        "label": "Connections"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ]
+            },
+            {
+                "id": 9,
+                "title": "Event Publishing Rate",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 32
+                },
+                "targets": [
+                    {
+                        "expr": "sum(rate(cqar_event_published_total[5m])) by (event_type)",
+                        "legendFormat": "{{event_type}}",
+                        "refId": "A"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "ops",
+                        "label": "Events/sec"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ]
+            },
+            {
+                "id": 10,
+                "title": "Service Health Status",
+                "type": "stat",
+                "gridPos": {
+                    "h": 4,
+                    "w": 6,
+                    "x": 12,
+                    "y": 32
+                },
+                "targets": [
+                    {
+                        "expr": "up{job=\"cqar\"}",
+                        "refId": "A"
+                    }
+                ],
+                "options": {
+                    "graphMode": "none",
+                    "colorMode": "background",
+                    "justifyMode": "center",
+                    "textMode": "value_and_name"
+                },
+                "fieldConfig": {
+                    "defaults": {
+                        "mappings": [
+                            {
+                                "type": "value",
+                                "value": "0",
+                                "text": "DOWN"
+                            },
+                            {
+                                "type": "value",
+                                "value": "1",
+                                "text": "UP"
+                            }
+                        ],
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {
+                                    "value": 0,
+                                    "color": "red"
+                                },
+                                {
+                                    "value": 1,
+                                    "color": "green"
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            {
+                "id": 11,
+                "title": "Pod Count",
+                "type": "stat",
+                "gridPos": {
+                    "h": 4,
+                    "w": 6,
+                    "x": 18,
+                    "y": 32
+                },
+                "targets": [
+                    {
+                        "expr": "count(up{job=\"cqar\"})",
+                        "refId": "A"
+                    }
+                ],
+                "options": {
+                    "graphMode": "area",
+                    "colorMode": "value",
+                    "justifyMode": "center",
+                    "textMode": "value_and_name"
+                }
+            },
+            {
+                "id": 12,
+                "title": "CPU Usage",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 36
+                },
+                "targets": [
+                    {
+                        "expr": "rate(process_cpu_seconds_total{job=\"cqar\"}[5m])",
+                        "legendFormat": "{{instance}}",
+                        "refId": "A"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "short",
+                        "label": "Cores",
+                        "max": 2
+                    },
+                    {
+                        "format": "short"
+                    }
+                ],
+                "thresholds": [
+                    {
+                        "value": 1.8,
+                        "colorMode": "warning",
+                        "op": "gt",
+                        "fill": false,
+                        "line": true
+                    }
+                ]
+            },
+            {
+                "id": 13,
+                "title": "Memory Usage",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 40
+                },
+                "targets": [
+                    {
+                        "expr": "process_resident_memory_bytes{job=\"cqar\"}",
+                        "legendFormat": "{{instance}}",
+                        "refId": "A"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "bytes",
+                        "label": "Memory"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ],
+                "thresholds": [
+                    {
+                        "value": 1700000000,
+                        "colorMode": "warning",
+                        "op": "gt",
+                        "fill": false,
+                        "line": true
+                    }
+                ]
+            },
+            {
+                "id": 14,
+                "title": "Goroutines",
+                "type": "graph",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 40
+                },
+                "targets": [
+                    {
+                        "expr": "go_goroutines{job=\"cqar\"}",
+                        "legendFormat": "{{instance}}",
+                        "refId": "A"
+                    }
+                ],
+                "yaxes": [
+                    {
+                        "format": "short",
+                        "label": "Goroutines"
+                    },
+                    {
+                        "format": "short"
+                    }
+                ]
+            }
+        ]
+    }
+}

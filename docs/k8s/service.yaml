@@ -1,0 +1,86 @@
+---
+# gRPC Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: cqar-grpc
+  namespace: cqar
+  labels:
+    app: cqar
+    service: grpc
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "cqar-backend-config"}'
+spec:
+  type: ClusterIP
+  selector:
+    app: cqar
+  ports:
+  - name: grpc
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  sessionAffinity: None
+
+---
+# HTTP Service (Health checks)
+apiVersion: v1
+kind: Service
+metadata:
+  name: cqar-http
+  namespace: cqar
+  labels:
+    app: cqar
+    service: http
+spec:
+  type: ClusterIP
+  selector:
+    app: cqar
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+
+---
+# Metrics Service (Prometheus scraping)
+apiVersion: v1
+kind: Service
+metadata:
+  name: cqar-metrics
+  namespace: cqar
+  labels:
+    app: cqar
+    service: metrics
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9091"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app: cqar
+  ports:
+  - name: metrics
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+
+---
+# Headless service for StatefulSet (if needed for leader election)
+apiVersion: v1
+kind: Service
+metadata:
+  name: cqar-headless
+  namespace: cqar
+  labels:
+    app: cqar
+spec:
+  clusterIP: None
+  selector:
+    app: cqar
+  ports:
+  - name: grpc
+    port: 9090
+    targetPort: 9090
+    protocol: TCP

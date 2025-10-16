@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cqar
+  namespace: cqar
+  labels:
+    app: cqar
+    version: v0.1.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0  # Zero-downtime deployment
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: cqar
+  template:
+    metadata:
+      labels:
+        app: cqar
+        version: v0.1.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: cqar
+      
+      # Anti-affinity: spread pods across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: cqar
+              topologyKey: kubernetes.io/hostname
+          # Spread across availability zones
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: cqar
+              topologyKey: topology.kubernetes.io/zone
+      
+      containers:
+      - name: cqar
+        image: gcr.io/combine-capital/cqar:0.1.0
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - name: grpc
+          containerPort: 9090
+          protocol: TCP
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9091
+          protocol: TCP
+        
+        # Environment variables from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: cqar-config
+        
+        # Sensitive environment variables from Secret
+        env:
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cqar-secrets
+              key: database-password
+        - name: CACHE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cqar-secrets
+              key: redis-password
+        - name: AUTH_API_KEYS
+          valueFrom:
+            secretKeyRef:
+              name: cqar-secrets
+              key: api-keys
+        
+        # Resource limits
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        
+        # Liveness probe: is the service running?
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Readiness probe: is the service ready to accept traffic?
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 2
+        
+        # Lifecycle hooks
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]  # Grace period for connection draining
+        
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volume mounts (if needed)
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /cache
+      
+      # Volumes
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      
+      # Termination grace period (allow 30s for graceful shutdown)
+      terminationGracePeriodSeconds: 30

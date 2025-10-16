@@ -1,0 +1,105 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cqar-network-policy
+  namespace: cqar
+spec:
+  podSelector:
+    matchLabels:
+      app: cqar
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow gRPC traffic from cqmd service
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: cqmd
+    ports:
+    - protocol: TCP
+      port: 9090
+  
+  # Allow gRPC traffic from cqpm service
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: cqpm
+    ports:
+    - protocol: TCP
+      port: 9090
+  
+  # Allow gRPC traffic from cqvx service
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: cqvx
+    ports:
+    - protocol: TCP
+      port: 9090
+  
+  # Allow HTTP health checks from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Allow metrics scraping from Prometheus
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: observability
+    ports:
+    - protocol: TCP
+      port: 9091
+  
+  egress:
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+  
+  # Allow PostgreSQL connection
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 5432
+  
+  # Allow Redis connection
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 6379
+  
+  # Allow NATS connection
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 4222
+  
+  # Allow OpenTelemetry collector connection
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: observability
+    ports:
+    - protocol: TCP
+      port: 4317
+  
+  # Allow HTTPS for external API calls (if needed)
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443

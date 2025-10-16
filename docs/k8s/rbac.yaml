@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cqar
+  namespace: cqar
+  labels:
+    app: cqar
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cqar-role
+  namespace: cqar
+rules:
+# Allow reading ConfigMaps and Secrets
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+# Allow reading Services for service discovery
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cqar-rolebinding
+  namespace: cqar
+subjects:
+- kind: ServiceAccount
+  name: cqar
+  namespace: cqar
+roleRef:
+  kind: Role
+  name: cqar-role
+  apiGroup: rbac.authorization.k8s.io

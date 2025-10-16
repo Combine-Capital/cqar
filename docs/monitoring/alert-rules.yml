@@ -1,0 +1,269 @@
+groups:
+- name: cqar_alerts
+  interval: 30s
+  rules:
+  
+  # Service availability
+  - alert: CQARServiceDown
+    expr: up{job="cqar"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR service is down"
+      description: "CQAR instance {{ $labels.instance }} is not responding to health checks for 1 minute."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-service-down"
+  
+  # High error rate
+  - alert: CQARHighErrorRate
+    expr: |
+      (
+        sum(rate(cqar_grpc_calls_total{status_code!="OK"}[5m]))
+        /
+        sum(rate(cqar_grpc_calls_total[5m]))
+      ) > 0.01
+    for: 5m
+    labels:
+      severity: critical
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR error rate above 1%"
+      description: "CQAR error rate is {{ $value | humanizePercentage }} (threshold: 1%). Check logs for specific errors."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-high-error-rate"
+  
+  # High latency (p99 > 50ms for GetAsset)
+  - alert: CQARHighLatencyGetAsset
+    expr: |
+      histogram_quantile(0.99,
+        rate(cqar_grpc_call_duration_seconds_bucket{method=~".*GetAsset"}[5m])
+      ) > 0.050
+    for: 5m
+    labels:
+      severity: warning
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR GetAsset p99 latency above 50ms"
+      description: "GetAsset p99 latency is {{ $value | humanizeDuration }} for method {{ $labels.method }}. Target: <50ms."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-high-latency"
+  
+  # High latency (p99 > 100ms for GetVenueSymbol)
+  - alert: CQARHighLatencyGetVenueSymbol
+    expr: |
+      histogram_quantile(0.99,
+        rate(cqar_grpc_call_duration_seconds_bucket{method=~".*GetVenueSymbol"}[5m])
+      ) > 0.100
+    for: 5m
+    labels:
+      severity: critical
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR GetVenueSymbol p99 latency above 100ms"
+      description: "GetVenueSymbol p99 latency is {{ $value | humanizeDuration }}. This impacts cqmd price ingestion. Target: <50ms."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-high-latency"
+  
+  # Low cache hit rate
+  - alert: CQARLowCacheHitRate
+    expr: |
+      (
+        sum(rate(cqar_cache_hit_total[5m]))
+        /
+        (sum(rate(cqar_cache_hit_total[5m])) + sum(rate(cqar_cache_miss_total[5m])))
+      ) < 0.70
+    for: 10m
+    labels:
+      severity: warning
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR cache hit rate below 70%"
+      description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 70%). Check Redis health and TTL configuration."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-low-cache-hit-rate"
+  
+  # Database connection pool exhaustion
+  - alert: CQARDatabasePoolExhausted
+    expr: |
+      (cqar_db_pool_active_connections / cqar_db_pool_max_connections) > 0.90
+    for: 5m
+    labels:
+      severity: critical
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR database pool usage above 90%"
+      description: "Database connection pool usage: {{ $value | humanizePercentage }}. Consider increasing max_conns or scaling horizontally."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-db-pool-exhausted"
+  
+  # High memory usage
+  - alert: CQARHighMemoryUsage
+    expr: |
+      (
+        process_resident_memory_bytes{job="cqar"}
+        /
+        container_spec_memory_limit_bytes{pod=~"cqar-.*"}
+      ) > 0.85
+    for: 5m
+    labels:
+      severity: warning
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR memory usage above 85%"
+      description: "Memory usage is {{ $value | humanizePercentage }} on pod {{ $labels.pod }}. Check for memory leaks."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-high-memory"
+  
+  # High CPU usage
+  - alert: CQARHighCPUUsage
+    expr: |
+      rate(process_cpu_seconds_total{job="cqar"}[5m]) > 1.8
+    for: 5m
+    labels:
+      severity: warning
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR CPU usage above 90%"
+      description: "CPU usage is {{ $value | humanize }} cores on instance {{ $labels.instance }} (limit: 2 cores). Consider scaling horizontally."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-high-cpu"
+  
+  # Event publishing failures
+  - alert: CQAREventPublishingFailures
+    expr: |
+      rate(cqar_event_publish_errors_total[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR event publishing failing"
+      description: "Event publishing error rate: {{ $value | humanize }} errors/sec. Check NATS connection."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-event-failures"
+  
+  # Slow database queries
+  - alert: CQARSlowDatabaseQueries
+    expr: |
+      histogram_quantile(0.99,
+        rate(cqar_db_query_duration_seconds_bucket[5m])
+      ) > 0.100
+    for: 10m
+    labels:
+      severity: warning
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR database queries are slow"
+      description: "Database query p99 latency is {{ $value | humanizeDuration }} (threshold: 100ms). Check database performance and indexes."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-slow-queries"
+  
+  # Pod restarts
+  - alert: CQARFrequentPodRestarts
+    expr: |
+      rate(kube_pod_container_status_restarts_total{namespace="cqar",pod=~"cqar-.*"}[15m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR pods restarting frequently"
+      description: "Pod {{ $labels.pod }} has restarted {{ $value | humanize }} times in the last 15 minutes. Check logs for crash reasons."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-pod-restarts"
+  
+  # Deployment replica mismatch
+  - alert: CQARReplicaMismatch
+    expr: |
+      kube_deployment_spec_replicas{namespace="cqar",deployment="cqar"}
+      !=
+      kube_deployment_status_replicas_available{namespace="cqar",deployment="cqar"}
+    for: 5m
+    labels:
+      severity: warning
+      service: cqar
+      team: platform
+    annotations:
+      summary: "CQAR deployment has fewer available replicas than desired"
+      description: "Desired replicas: {{ $labels.spec_replicas }}, Available: {{ $value }}. Check pod status."
+      runbook_url: "https://docs.combine-capital.com/runbooks/cqar-replica-mismatch"
+
+# Cache-specific alerts
+- name: cqar_cache_alerts
+  interval: 30s
+  rules:
+  
+  - alert: CQARRedisDown
+    expr: redis_up{job="redis",namespace="cqar"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: cqar
+      component: redis
+      team: platform
+    annotations:
+      summary: "CQAR Redis cache is down"
+      description: "Redis instance for CQAR is not responding. All requests will query database directly, causing increased latency."
+      runbook_url: "https://docs.combine-capital.com/runbooks/redis-down"
+  
+  - alert: CQARRedisHighMemory
+    expr: |
+      (redis_memory_used_bytes{job="redis",namespace="cqar"} / redis_memory_max_bytes) > 0.90
+    for: 5m
+    labels:
+      severity: warning
+      service: cqar
+      component: redis
+      team: platform
+    annotations:
+      summary: "CQAR Redis memory usage above 90%"
+      description: "Redis memory usage: {{ $value | humanizePercentage }}. Evictions may occur, reducing cache hit rate."
+      runbook_url: "https://docs.combine-capital.com/runbooks/redis-high-memory"
+
+# Database-specific alerts
+- name: cqar_database_alerts
+  interval: 30s
+  rules:
+  
+  - alert: CQARDatabaseDown
+    expr: pg_up{job="postgres",database="cqar_prod"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: cqar
+      component: postgres
+      team: platform
+    annotations:
+      summary: "CQAR PostgreSQL database is down"
+      description: "PostgreSQL database for CQAR is not responding. Service will be unavailable."
+      runbook_url: "https://docs.combine-capital.com/runbooks/postgres-down"
+  
+  - alert: CQARDatabaseHighConnections
+    expr: |
+      (pg_stat_database_numbackends{datname="cqar_prod"} / pg_settings_max_connections) > 0.80
+    for: 5m
+    labels:
+      severity: warning
+      service: cqar
+      component: postgres
+      team: platform
+    annotations:
+      summary: "CQAR PostgreSQL connections above 80%"
+      description: "Database connection usage: {{ $value | humanizePercentage }}. Approaching max_connections limit."
+      runbook_url: "https://docs.combine-capital.com/runbooks/postgres-high-connections"
+  
+  - alert: CQARDatabaseReplicationLag
+    expr: |
+      pg_replication_lag_seconds{job="postgres"} > 30
+    for: 5m
+    labels:
+      severity: warning
+      service: cqar
+      component: postgres
+      team: platform
+    annotations:
+      summary: "CQAR PostgreSQL replication lag high"
+      description: "Replication lag is {{ $value | humanizeDuration }}. Read replicas may serve stale data."
+      runbook_url: "https://docs.combine-capital.com/runbooks/postgres-replication-lag"

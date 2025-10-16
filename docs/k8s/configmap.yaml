@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cqar-config
+  namespace: cqar
+data:
+  SERVICE_NAME: "cqar"
+  SERVICE_VERSION: "0.1.0"
+  SERVICE_ENV: "production"
+  
+  # Server
+  SERVER_HTTP_PORT: "8080"
+  SERVER_GRPC_PORT: "9090"
+  SERVER_SHUTDOWN_TIMEOUT: "30s"
+  
+  # Database (non-sensitive values)
+  DATABASE_HOST: "postgres.cqar.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_USER: "cqar_prod_user"
+  DATABASE_DATABASE: "cqar_prod"
+  DATABASE_SSL_MODE: "require"
+  DATABASE_MAX_CONNS: "25"
+  DATABASE_MIN_CONNS: "5"
+  DATABASE_MAX_CONN_LIFETIME: "15m"
+  DATABASE_MAX_CONN_IDLE_TIME: "5m"
+  DATABASE_CONNECT_TIMEOUT: "5s"
+  DATABASE_QUERY_TIMEOUT: "30s"
+  
+  # Cache (non-sensitive values)
+  CACHE_HOST: "redis.cqar.svc.cluster.local"
+  CACHE_PORT: "6379"
+  CACHE_DB: "0"
+  CACHE_DEFAULT_TTL: "60m"
+  CACHE_MAX_RETRIES: "3"
+  CACHE_MIN_IDLE_CONNS: "5"
+  CACHE_POOL_SIZE: "10"
+  
+  # Event Bus
+  EVENTBUS_BACKEND: "jetstream"
+  EVENTBUS_SERVERS: "nats://nats-1.cqar.svc.cluster.local:4222,nats://nats-2.cqar.svc.cluster.local:4222,nats://nats-3.cqar.svc.cluster.local:4222"
+  EVENTBUS_STREAM_NAME: "cqc_events"
+  EVENTBUS_CONSUMER_NAME: "cqar"
+  EVENTBUS_MAX_DELIVER: "3"
+  EVENTBUS_ACK_WAIT: "30s"
+  EVENTBUS_MAX_ACK_PENDING: "1000"
+  
+  # Logging
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  LOG_ADD_CALLER: "false"
+  
+  # Metrics
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9091"
+  
+  # Tracing
+  TRACING_ENABLED: "true"
+  TRACING_ENDPOINT: "otel-collector.observability.svc.cluster.local:4317"
+  TRACING_SAMPLE_RATE: "0.1"  # 10% sampling in production
