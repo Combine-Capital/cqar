@@ -21,9 +21,11 @@ database:
   database: "cqar"
   ssl_mode: "disable"
   max_conns: 25
-  min_idle_conns: 5
+  min_conns: 5
   max_conn_lifetime: "15m"
-  connection_timeout: "5s"
+  max_conn_idle_time: "5m"
+  connect_timeout: "5s"
+  query_timeout: "30s"
 
 cache:
   host: "localhost"
@@ -52,7 +54,7 @@ log:
 
 metrics:
   enabled: true
-  port: 9090
+  port: 9091
   path: "/metrics"
   namespace: "cqar"
 

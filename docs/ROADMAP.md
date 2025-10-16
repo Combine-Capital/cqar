@@ -13,7 +13,7 @@
 - [x] **Commit 9b**: gRPC Server - Asset Deployment & Relationship Methods
 - [x] **Commit 8**: Business Logic - Symbol & Venue Management
 - [x] **Commit 9c**: gRPC Server - Quality, Chain, Symbol, Venue Methods
-- [ ] **Commit 9d**: CQI Service Integration
+- [x] **Commit 9d**: CQI Service Integration
 - [ ] **Commit 9e**: gRPC Middleware Chain
 - [ ] **Commit 10**: Event Publishing System
 - [ ] **Commit 11**: Cache Layer Integration
@@ -278,18 +278,22 @@
 **Depends**: Commit 9c
 
 **Deliverables**:
-- [ ] `internal/service/service.go` implementing cqi.Service interface (Start, Stop, Name, Health)
-- [ ] Service.Start initializes: database pool → repository → managers → gRPC server → HTTP health server
-- [ ] Service.Stop implements graceful shutdown: stop accepting requests → drain in-flight → close connections (30s timeout)
-- [ ] `cmd/server/main.go` uses CQI bootstrap to load config, initialize logging/metrics/tracing
-- [ ] main.go handles SIGINT/SIGTERM for graceful shutdown
-- [ ] Health endpoints: /health/live (liveness), /health/ready (readiness with component checks)
+- [x] `internal/service/service.go` implementing cqi.Service interface (Start, Stop, Name, Health)
+- [x] Service.Start initializes: database pool → repository → managers → gRPC server → HTTP health server
+- [x] Service.Stop implements graceful shutdown: stop accepting requests → drain in-flight → close connections (30s timeout)
+- [x] `cmd/server/main.go` uses CQI bootstrap to load config, initialize logging/metrics/tracing
+- [x] main.go handles SIGINT/SIGTERM for graceful shutdown via CQI WaitForShutdown
+- [x] Health endpoints: /health/live (liveness), /health/ready (readiness with component checks)
+- [x] gRPC health check endpoint via grpc.health.v1.Health
+- [x] gRPC reflection enabled for grpcurl introspection
 
 **Success**:
-- `make run` starts service, logs "gRPC server listening on :9090"
-- `grpcurl localhost:9090 list` shows AssetRegistry service methods
-- Health check: `curl localhost:8080/health/ready` returns 200 with component status
-- SIGTERM triggers graceful shutdown, logs "shutting down gracefully"
+- ✅ `./bin/cqar -config config.yaml` starts service, logs "CQAR service started successfully"
+- ✅ `grpcurl -plaintext localhost:9090 list` shows AssetRegistry service methods (42 methods)
+- ✅ Health check: `curl localhost:8080/health/ready` returns 200 with `{"status":"ready","components":{"database":"ok"}}`
+- ✅ Liveness check: `curl localhost:8080/health/live` returns 200 with `{"status":"ok"}`
+- ✅ gRPC health check: `grpcurl -plaintext localhost:9090 grpc.health.v1.Health/Check` returns `{"status":"SERVING"}`
+- ✅ SIGTERM triggers graceful shutdown with proper component cleanup order (HTTP → gRPC → Database)
 
 ---
 

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/Combine-Capital/cqar/internal/config"
+	cqarservice "github.com/Combine-Capital/cqar/internal/service"
 	"github.com/Combine-Capital/cqi/pkg/service"
 )
 
@@ -56,20 +57,16 @@ func main() {
 		Str("environment", cfg.Service.Env).
 		Msg("Starting CQAR service")
 
-	// TODO: Initialize service components (database, cache, event bus, etc.)
-	// This will be implemented in later commits as dependencies are added
+	// Create and initialize service
+	cqarService := cqarservice.New(cfg, bootstrap.Logger)
+	if err := cqarService.Start(ctx); err != nil {
+		bootstrap.Logger.Fatal().Err(err).Msg("Failed to start service")
+	}
 
-	bootstrap.Logger.Info().
-		Int("grpc_port", cfg.Server.GRPCPort).
-		Int("http_port", cfg.Server.HTTPPort).
-		Msg("CQAR service initialized")
-
-	// TODO: Create and start HTTP/gRPC services
-	// This will be implemented in Commit 9
+	bootstrap.Logger.Info().Msg("Service ready, waiting for shutdown signal")
 
 	// Wait for shutdown signal using CQI's WaitForShutdown
-	bootstrap.Logger.Info().Msg("Service ready, waiting for shutdown signal")
-	service.WaitForShutdown(ctx /* services will be added here */)
+	service.WaitForShutdown(ctx, cqarService)
 
 	bootstrap.Logger.Info().Msg("CQAR service stopped")
 }
