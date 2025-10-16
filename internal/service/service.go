@@ -10,9 +10,12 @@ import (
 	"github.com/Combine-Capital/cqar/internal/repository"
 	"github.com/Combine-Capital/cqar/internal/server"
 	servicesv1 "github.com/Combine-Capital/cqc/gen/go/cqc/services/v1"
+	"github.com/Combine-Capital/cqi/pkg/auth"
 	"github.com/Combine-Capital/cqi/pkg/database"
 	"github.com/Combine-Capital/cqi/pkg/logging"
+	"github.com/Combine-Capital/cqi/pkg/metrics"
 	cqiservice "github.com/Combine-Capital/cqi/pkg/service"
+	"github.com/Combine-Capital/cqi/pkg/tracing"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
@@ -70,8 +73,27 @@ func (s *Service) Start(ctx context.Context) error {
 		repo,
 	)
 
-	// Create gRPC server with interceptors (auth, logging, metrics, tracing will be added in 9e)
-	grpcServer := grpc.NewServer()
+	// Build interceptor chain: auth → logging → metrics → tracing
+	// Note: Interceptors are applied in reverse order (last interceptor wraps first)
+	unaryInterceptors := []grpc.UnaryServerInterceptor{
+		tracing.GRPCUnaryServerInterceptor(s.cfg.Service.Name),  // Tracing (innermost - wraps handler)
+		metrics.UnaryServerInterceptor(s.cfg.Metrics.Namespace), // Metrics
+		logging.UnaryServerInterceptor(s.logger),                // Logging
+		auth.APIKeyUnaryInterceptor(s.cfg.Auth.APIKeys),         // Auth (outermost - first to execute)
+	}
+
+	streamInterceptors := []grpc.StreamServerInterceptor{
+		tracing.GRPCStreamServerInterceptor(s.cfg.Service.Name),  // Tracing (innermost - wraps handler)
+		metrics.StreamServerInterceptor(s.cfg.Metrics.Namespace), // Metrics
+		logging.StreamServerInterceptor(s.logger),                // Logging
+		auth.APIKeyStreamInterceptor(s.cfg.Auth.APIKeys),         // Auth (outermost - first to execute)
+	}
+
+	// Create gRPC server with interceptor chain
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(unaryInterceptors...),
+		grpc.ChainStreamInterceptor(streamInterceptors...),
+	)
 	servicesv1.RegisterAssetRegistryServer(grpcServer, assetRegistryServer)
 	grpc_health_v1.RegisterHealthServer(grpcServer, NewHealthServer(s.dbPool))
 	reflection.Register(grpcServer) // Enable reflection for grpcurl

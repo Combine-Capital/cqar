@@ -35,3 +35,10 @@ tracing:
   enabled: true
   endpoint: "${CQAR_TRACING_ENDPOINT}"
   sample_rate: 0.1  # Sample 10% of traces in production
+
+auth:
+  api_keys:
+    - "${CQAR_API_KEY_CQMD}"
+    - "${CQAR_API_KEY_CQPM}"
+    - "${CQAR_API_KEY_CQVX}"
+    - "${CQAR_API_KEY_ADMIN}"

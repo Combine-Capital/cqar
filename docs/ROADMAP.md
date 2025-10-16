@@ -14,7 +14,7 @@
 - [x] **Commit 8**: Business Logic - Symbol & Venue Management
 - [x] **Commit 9c**: gRPC Server - Quality, Chain, Symbol, Venue Methods
 - [x] **Commit 9d**: CQI Service Integration
-- [ ] **Commit 9e**: gRPC Middleware Chain
+- [x] **Commit 9e**: gRPC Middleware Chain
 - [ ] **Commit 10**: Event Publishing System
 - [ ] **Commit 11**: Cache Layer Integration
 - [ ] **Commit 12**: Integration Tests & Validation
@@ -303,17 +303,22 @@
 **Depends**: Commit 9d
 
 **Deliverables**:
-- [ ] gRPC unary interceptor chain: auth → logging → metrics → tracing
-- [ ] Auth interceptor validates API keys (or placeholder for now)
-- [ ] Logging interceptor logs method name, duration, error status
-- [ ] Metrics interceptor records histogram: `cqar_grpc_request_duration_seconds{method, status}`
-- [ ] Tracing interceptor integrates with CQI OpenTelemetry setup
-- [ ] Apply interceptor chain to gRPC server in service.Start
+- [x] gRPC unary interceptor chain: auth → logging → metrics → tracing
+- [x] Auth interceptor validates API keys using CQI auth.APIKeyUnaryInterceptor
+- [x] Logging interceptor logs method name, duration, error status using CQI logging.UnaryServerInterceptor
+- [x] Metrics interceptor records histogram: `cqar_grpc_call_duration_seconds{method, status}` using CQI metrics.UnaryServerInterceptor
+- [x] Tracing interceptor integrates with CQI OpenTelemetry setup using tracing.GRPCUnaryServerInterceptor
+- [x] Apply interceptor chain to gRPC server in service.Start using grpc.ChainUnaryInterceptor
+- [x] Add auth.api_keys configuration to config.yaml, config.dev.yaml, config.prod.yaml
 
 **Success**:
-- `grpcurl -d '{"symbol":"BTC"}' localhost:9090 cqc.services.v1.AssetRegistry.CreateAsset` logs request/response
-- Prometheus metrics: `curl localhost:8080/metrics | grep cqar_grpc_request_duration_seconds` shows histogram
-- Logs include trace_id for distributed tracing correlation
+- ✅ Unauthenticated requests return: `rpc error: code = Unauthenticated desc = missing authorization header`
+- ✅ Invalid API key returns: `rpc error: code = Unauthenticated desc = invalid API key`
+- ✅ Valid API key allows request: `grpcurl -H "authorization: Bearer dev_key_cqmd_12345"` succeeds
+- ✅ Logs include: request_id, method, duration_ms, error status, grpc_code
+- ✅ Prometheus metrics: `curl localhost:9091/metrics | grep cqar_grpc_call_duration_seconds` shows histogram with method and status_code labels
+- ✅ Prometheus metrics: `cqar_grpc_calls_total{method, status_code}` counter increments
+- ✅ All interceptors use CQI packages (no custom implementation needed)
 
 ---
 

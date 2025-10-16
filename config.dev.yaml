@@ -15,3 +15,10 @@ tracing:
   enabled: true
   endpoint: "localhost:4317"
   sample_rate: 1.0  # Sample all traces in development
+
+auth:
+  api_keys:
+    - "dev_key_cqmd_12345"
+    - "dev_key_cqpm_67890"
+    - "dev_key_cqvx_abcde"
+    - "dev_key_test_99999"  # Extra key for testing

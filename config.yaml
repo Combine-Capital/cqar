@@ -64,6 +64,12 @@ tracing:
   sample_rate: 0.1
   service_name: "cqar"
 
+auth:
+  api_keys:
+    - "dev_key_cqmd_12345"
+    - "dev_key_cqpm_67890"
+    - "dev_key_cqvx_abcde"
+
 # CQAR-specific settings
 cache_ttl:
   asset: "60m"
