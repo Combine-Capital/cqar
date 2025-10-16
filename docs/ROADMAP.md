@@ -11,7 +11,8 @@
 - [x] **Commit 8**: Business Logic - Symbol & Venue Management
 - [x] **Commit 9a**: gRPC Server - Core Asset Methods
 - [x] **Commit 9b**: gRPC Server - Asset Deployment & Relationship Methods
-- [ ] **Commit 9c**: gRPC Server - Quality, Chain, Symbol, Venue Methods
+- [x] **Commit 8**: Business Logic - Symbol & Venue Management
+- [x] **Commit 9c**: gRPC Server - Quality, Chain, Symbol, Venue Methods
 - [ ] **Commit 9d**: CQI Service Integration
 - [ ] **Commit 9e**: gRPC Middleware Chain
 - [ ] **Commit 10**: Event Publishing System
@@ -257,17 +258,17 @@
 **Depends**: Commit 9b
 
 **Deliverables**:
-- [ ] Add 3 quality flag methods: RaiseQualityFlag, ResolveQualityFlag, ListQualityFlags
-- [ ] Add 3 chain methods: CreateChain, GetChain, ListChains
-- [ ] Add 9 symbol methods: CreateSymbol, GetSymbol, UpdateSymbol, DeleteSymbol, ListSymbols, SearchSymbols, CreateSymbolIdentifier, GetSymbolIdentifier, ListSymbolIdentifiers
-- [ ] Add 9 venue methods: CreateVenue, GetVenue, ListVenues, CreateVenueAsset, GetVenueAsset, ListVenueAssets, CreateVenueSymbol, GetVenueSymbol, ListVenueSymbols
-- [ ] All methods call appropriate manager/repository methods
-- [ ] Stub unimplemented identifier methods with status.Error(codes.Unimplemented) if not backed by managers
+- [x] Add 3 quality flag methods: RaiseQualityFlag, ResolveQualityFlag, ListQualityFlags
+- [x] Add 3 chain methods: CreateChain, GetChain, ListChains
+- [x] Add 9 symbol methods: CreateSymbol, GetSymbol, UpdateSymbol, DeleteSymbol, ListSymbols, SearchSymbols, CreateSymbolIdentifier, GetSymbolIdentifier, ListSymbolIdentifiers
+- [x] Add 9 venue methods: CreateVenue, GetVenue, ListVenues, CreateVenueAsset, GetVenueAsset, ListVenueAssets, CreateVenueSymbol, GetVenueSymbol, ListVenueSymbols
+- [x] All methods call appropriate manager/repository methods
+- [x] Stub unimplemented identifier methods with status.Error(codes.Unimplemented) if not backed by managers
 
 **Success**:
-- `go build ./internal/server` compiles successfully
-- All 24 methods implemented (total 39 methods across 9a+9b+9c)
-- Server implements complete AssetRegistry gRPC interface
+- ✅ `go build ./internal/server` compiles successfully
+- ✅ All 24 methods implemented (total 42 methods across 9a+9b+9c)
+- ✅ Server implements complete AssetRegistry gRPC interface
 
 ---
 
