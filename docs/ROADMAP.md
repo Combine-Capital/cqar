@@ -10,7 +10,7 @@
 - [x] **Commit 7**: Business Logic - Asset Management
 - [x] **Commit 8**: Business Logic - Symbol & Venue Management
 - [x] **Commit 9a**: gRPC Server - Core Asset Methods
-- [ ] **Commit 9b**: gRPC Server - Asset Deployment & Relationship Methods
+- [x] **Commit 9b**: gRPC Server - Asset Deployment & Relationship Methods
 - [ ] **Commit 9c**: gRPC Server - Quality, Chain, Symbol, Venue Methods
 - [ ] **Commit 9d**: CQI Service Integration
 - [ ] **Commit 9e**: gRPC Middleware Chain
@@ -237,17 +237,17 @@
 **Depends**: Commit 9a
 
 **Deliverables**:
-- [ ] Add 3 deployment methods: CreateAssetDeployment, GetAssetDeployment, ListAssetDeployments
-- [ ] Add 2 relationship methods: CreateAssetRelationship, ListAssetRelationships
-- [ ] Add 4 group methods: CreateAssetGroup, GetAssetGroup, AddAssetToGroup, RemoveAssetFromGroup
-- [ ] Handle DeploymentFilter for ListAssetDeployments (filter by asset_id)
-- [ ] Handle RelationshipFilter for ListAssetRelationships (filter by asset_id)
-- [ ] All methods follow same error wrapping pattern as Commit 9a
+- [x] Add 3 deployment methods: CreateAssetDeployment, GetAssetDeployment, ListAssetDeployments
+- [x] Add 2 relationship methods: CreateAssetRelationship, ListAssetRelationships
+- [x] Add 4 group methods: CreateAssetGroup, GetAssetGroup, AddAssetToGroup, RemoveAssetFromGroup
+- [x] Handle DeploymentFilter for ListAssetDeployments (filter by asset_id)
+- [x] Handle RelationshipFilter for ListAssetRelationships (filter by asset_id)
+- [x] All methods follow same error wrapping pattern as Commit 9a
 
 **Success**:
-- `go build ./internal/server` compiles successfully
-- All 9 additional methods have correct signatures
-- DeploymentFilter and RelationshipFilter correctly constructed from requests
+- ✅ `go build ./internal/server` compiles successfully
+- ✅ All 9 additional methods have correct signatures
+- ✅ DeploymentFilter and RelationshipFilter correctly constructed from requests
 
 ---
 
