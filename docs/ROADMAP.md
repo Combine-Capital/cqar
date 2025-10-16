@@ -15,7 +15,7 @@
 - [x] **Commit 9c**: gRPC Server - Quality, Chain, Symbol, Venue Methods
 - [x] **Commit 9d**: CQI Service Integration
 - [x] **Commit 9e**: gRPC Middleware Chain
-- [ ] **Commit 10**: Event Publishing System
+- [x] **Commit 10**: Event Publishing System
 - [ ] **Commit 11**: Cache Layer Integration
 - [ ] **Commit 12**: Integration Tests & Validation
 - [ ] **Final**: Documentation & Deployment Configuration
@@ -328,17 +328,17 @@
 **Depends**: Commit 9
 
 **Deliverables**:
-- [ ] `internal/manager/events.go` with EventPublisher struct using CQI event bus
-- [ ] EventPublisher.PublishAssetCreated builds AssetCreated event from CQC types, publishes to "cqc.events.v1.asset_created"
-- [ ] EventPublisher.PublishAssetDeploymentCreated publishes to "cqc.events.v1.asset_deployment_created"
-- [ ] EventPublisher.PublishRelationshipEstablished publishes to "cqc.events.v1.relationship_established"
-- [ ] EventPublisher.PublishQualityFlagRaised publishes to "cqc.events.v1.quality_flag_raised"
-- [ ] EventPublisher.PublishSymbolCreated publishes to "cqc.events.v1.symbol_created"
-- [ ] EventPublisher.PublishVenueAssetListed publishes to "cqc.events.v1.venue_asset_listed"
-- [ ] EventPublisher.PublishVenueSymbolListed publishes to "cqc.events.v1.venue_symbol_listed"
-- [ ] EventPublisher.PublishChainRegistered publishes to "cqc.events.v1.chain_registered"
-- [ ] All manager methods call EventPublisher after successful repository operations
-- [ ] Event publishing uses CQI automatic protobuf serialization, retry on failure, metrics
+- [x] `internal/manager/events.go` with EventPublisher struct using CQI event bus
+- [x] EventPublisher.PublishAssetCreated builds AssetCreated event from CQC types, publishes to "cqc.events.v1.asset_created"
+- [x] EventPublisher.PublishAssetDeploymentCreated publishes to "cqc.events.v1.asset_deployment_created"
+- [x] EventPublisher.PublishRelationshipEstablished publishes to "cqc.events.v1.relationship_established"
+- [x] EventPublisher.PublishQualityFlagRaised publishes to "cqc.events.v1.quality_flag_raised"
+- [x] EventPublisher.PublishSymbolCreated publishes to "cqc.events.v1.symbol_created"
+- [x] EventPublisher.PublishVenueAssetListed publishes to "cqc.events.v1.venue_asset_listed"
+- [x] EventPublisher.PublishVenueSymbolListed publishes to "cqc.events.v1.venue_symbol_listed"
+- [x] ChainRegistered event not implemented (event type not available in CQC)
+- [x] All manager methods call EventPublisher after successful repository operations
+- [x] Event publishing uses CQI automatic protobuf serialization, retry on failure, metrics
 
 **Success**:
 - CreateAsset successfully publishes AssetCreated event to NATS

@@ -14,17 +14,19 @@ import (
 // VenueManager handles business logic for venue operations, venue asset mapping,
 // and venue symbol resolution
 type VenueManager struct {
-	repo          repository.Repository
-	assetManager  *AssetManager
-	symbolManager *SymbolManager
+	repo           repository.Repository
+	assetManager   *AssetManager
+	symbolManager  *SymbolManager
+	eventPublisher *EventPublisher
 }
 
 // NewVenueManager creates a new VenueManager instance
-func NewVenueManager(repo repository.Repository, assetManager *AssetManager, symbolManager *SymbolManager) *VenueManager {
+func NewVenueManager(repo repository.Repository, assetManager *AssetManager, symbolManager *SymbolManager, eventPublisher *EventPublisher) *VenueManager {
 	return &VenueManager{
-		repo:          repo,
-		assetManager:  assetManager,
-		symbolManager: symbolManager,
+		repo:           repo,
+		assetManager:   assetManager,
+		symbolManager:  symbolManager,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -106,6 +108,11 @@ func (m *VenueManager) CreateVenueAsset(ctx context.Context, venueAsset *venuesv
 		return status.Error(codes.Internal, fmt.Sprintf("failed to create venue asset: %v", err))
 	}
 
+	// Publish VenueAssetListed event asynchronously
+	if m.eventPublisher != nil {
+		m.eventPublisher.PublishVenueAssetListed(ctx, venueAsset)
+	}
+
 	return nil
 }
 
@@ -166,6 +173,11 @@ func (m *VenueManager) CreateVenueSymbol(ctx context.Context, venueSymbol *venue
 	// Create the venue symbol in the repository
 	if err := m.repo.CreateVenueSymbol(ctx, venueSymbol); err != nil {
 		return status.Error(codes.Internal, fmt.Sprintf("failed to create venue symbol: %v", err))
+	}
+
+	// Publish VenueSymbolListed event asynchronously
+	if m.eventPublisher != nil {
+		m.eventPublisher.PublishVenueSymbolListed(ctx, venueSymbol)
 	}
 
 	return nil

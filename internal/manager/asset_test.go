@@ -357,8 +357,8 @@ func float64Ptr(f float64) *float64 {
 func TestAssetManager_CreateAsset_Validation(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	qualityMgr := NewQualityManager(repo)
-	mgr := NewAssetManager(repo, qualityMgr)
+	qualityMgr := NewQualityManager(repo, nil)
+	mgr := NewAssetManager(repo, qualityMgr, nil)
 
 	tests := []struct {
 		name        string
@@ -437,8 +437,8 @@ func TestAssetManager_CreateAsset_Validation(t *testing.T) {
 func TestAssetManager_CreateAssetDeployment_Validation(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	qualityMgr := NewQualityManager(repo)
-	mgr := NewAssetManager(repo, qualityMgr)
+	qualityMgr := NewQualityManager(repo, nil)
+	mgr := NewAssetManager(repo, qualityMgr, nil)
 
 	// Setup: Create asset and chain
 	asset := &assetsv1.Asset{
@@ -553,8 +553,8 @@ func TestAssetManager_CreateAssetDeployment_Validation(t *testing.T) {
 func TestAssetManager_CreateAssetRelationship_CycleDetection(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	qualityMgr := NewQualityManager(repo)
-	mgr := NewAssetManager(repo, qualityMgr)
+	qualityMgr := NewQualityManager(repo, nil)
+	mgr := NewAssetManager(repo, qualityMgr, nil)
 
 	// Setup: Create assets
 	eth := &assetsv1.Asset{
@@ -620,8 +620,8 @@ func TestAssetManager_CreateAssetRelationship_CycleDetection(t *testing.T) {
 func TestAssetManager_CreateAssetRelationship_SelfReferential(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	qualityMgr := NewQualityManager(repo)
-	mgr := NewAssetManager(repo, qualityMgr)
+	qualityMgr := NewQualityManager(repo, nil)
+	mgr := NewAssetManager(repo, qualityMgr, nil)
 
 	// Setup: Create asset
 	eth := &assetsv1.Asset{
@@ -653,8 +653,8 @@ func TestAssetManager_CreateAssetRelationship_SelfReferential(t *testing.T) {
 func TestAssetManager_CreateAssetGroup_MemberValidation(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	qualityMgr := NewQualityManager(repo)
-	mgr := NewAssetManager(repo, qualityMgr)
+	qualityMgr := NewQualityManager(repo, nil)
+	mgr := NewAssetManager(repo, qualityMgr, nil)
 
 	// Setup: Create assets
 	eth := &assetsv1.Asset{

@@ -11,6 +11,7 @@ import (
 	"github.com/Combine-Capital/cqar/internal/server"
 	servicesv1 "github.com/Combine-Capital/cqc/gen/go/cqc/services/v1"
 	"github.com/Combine-Capital/cqi/pkg/auth"
+	"github.com/Combine-Capital/cqi/pkg/bus"
 	"github.com/Combine-Capital/cqi/pkg/database"
 	"github.com/Combine-Capital/cqi/pkg/logging"
 	"github.com/Combine-Capital/cqi/pkg/metrics"
@@ -28,6 +29,7 @@ type Service struct {
 	cfg         *config.Config
 	logger      *logging.Logger
 	dbPool      *database.Pool
+	eventBus    bus.EventBus
 	grpcService *cqiservice.GRPCService
 	httpService *cqiservice.HTTPService
 }
@@ -43,10 +45,12 @@ func New(cfg *config.Config, logger *logging.Logger) *Service {
 // Start initializes all service components and starts the gRPC and HTTP servers.
 // Initialization order:
 // 1. Database pool
-// 2. Repository layer
-// 3. Business logic managers
-// 4. gRPC server with AssetRegistry implementation
-// 5. HTTP health server
+// 2. Event bus
+// 3. Repository layer
+// 4. Event publisher
+// 5. Business logic managers
+// 6. gRPC server with AssetRegistry implementation
+// 7. HTTP health server
 func (s *Service) Start(ctx context.Context) error {
 	s.logger.Info().Msg("Initializing CQAR service components")
 
@@ -55,14 +59,22 @@ func (s *Service) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
+	// Initialize event bus
+	if err := s.initEventBus(ctx); err != nil {
+		return fmt.Errorf("failed to initialize event bus: %w", err)
+	}
+
 	// Initialize repository
 	repo := repository.NewPostgresRepository(s.dbPool)
 
-	// Initialize managers
-	qualityMgr := manager.NewQualityManager(repo)
-	assetMgr := manager.NewAssetManager(repo, qualityMgr)
-	symbolMgr := manager.NewSymbolManager(repo, assetMgr)
-	venueMgr := manager.NewVenueManager(repo, assetMgr, symbolMgr)
+	// Initialize event publisher
+	eventPublisher := manager.NewEventPublisher(s.eventBus, s.logger)
+
+	// Initialize managers with event publisher
+	qualityMgr := manager.NewQualityManager(repo, eventPublisher)
+	assetMgr := manager.NewAssetManager(repo, qualityMgr, eventPublisher)
+	symbolMgr := manager.NewSymbolManager(repo, assetMgr, eventPublisher)
+	venueMgr := manager.NewVenueManager(repo, assetMgr, symbolMgr, eventPublisher)
 
 	// Create gRPC server with AssetRegistry implementation
 	assetRegistryServer := server.NewAssetRegistryServer(
@@ -149,7 +161,8 @@ func (s *Service) Start(ctx context.Context) error {
 // Components are stopped in reverse order of initialization:
 // 1. HTTP server (stop accepting health checks)
 // 2. gRPC server (drain in-flight requests)
-// 3. Database pool (close connections)
+// 3. Event bus (flush pending events)
+// 4. Database pool (close connections)
 func (s *Service) Stop(ctx context.Context) error {
 	s.logger.Info().Msg("Shutting down CQAR service")
 
@@ -164,6 +177,15 @@ func (s *Service) Stop(ctx context.Context) error {
 	if s.grpcService != nil {
 		if err := s.grpcService.Stop(ctx); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to stop gRPC server")
+		}
+	}
+
+	// Close event bus
+	if s.eventBus != nil {
+		if err := s.eventBus.Close(); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to close event bus")
+		} else {
+			s.logger.Info().Msg("Event bus closed")
 		}
 	}
 
@@ -214,6 +236,23 @@ func (s *Service) initDatabase(ctx context.Context) error {
 
 	s.dbPool = pool
 	s.logger.Info().Msg("Database connection established")
+	return nil
+}
+
+// initEventBus initializes the NATS JetStream event bus.
+func (s *Service) initEventBus(ctx context.Context) error {
+	s.logger.Info().
+		Strs("servers", s.cfg.EventBus.Servers).
+		Str("stream_name", s.cfg.EventBus.StreamName).
+		Msg("Connecting to event bus")
+
+	eventBus, err := bus.NewJetStream(ctx, s.cfg.EventBus)
+	if err != nil {
+		return fmt.Errorf("failed to create event bus: %w", err)
+	}
+
+	s.eventBus = eventBus
+	s.logger.Info().Msg("Event bus connection established")
 	return nil
 }
 

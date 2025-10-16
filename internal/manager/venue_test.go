@@ -189,10 +189,10 @@ func createTestVenueSymbol(venueID, symbolID, venueSymbolStr string) *venuesv1.V
 // TestCreateVenue_Success tests successful venue creation
 func TestCreateVenue_Success(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	venue := createTestVenue("binance", "Binance")
 	err := venueMgr.CreateVenue(context.Background(), venue)
@@ -204,10 +204,10 @@ func TestCreateVenue_Success(t *testing.T) {
 // TestCreateVenue_MissingVenueID tests validation when venue_id is missing
 func TestCreateVenue_MissingVenueID(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	venue := createTestVenue("binance", "Binance")
 	venue.VenueId = nil
@@ -224,10 +224,10 @@ func TestCreateVenue_MissingVenueID(t *testing.T) {
 // TestCreateVenueAsset_Success tests successful venue asset creation
 func TestCreateVenueAsset_Success(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create venue and asset first
 	venue := createTestVenue("binance", "Binance")
@@ -247,10 +247,10 @@ func TestCreateVenueAsset_Success(t *testing.T) {
 // TestCreateVenueAsset_MissingVenue tests validation when venue doesn't exist
 func TestCreateVenueAsset_MissingVenue(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create only asset
 	asset := createTestAsset("asset_btc", "BTC")
@@ -270,10 +270,10 @@ func TestCreateVenueAsset_MissingVenue(t *testing.T) {
 // TestCreateVenueAsset_MissingAsset tests validation when asset doesn't exist
 func TestCreateVenueAsset_MissingAsset(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create only venue
 	venue := createTestVenue("binance", "Binance")
@@ -293,10 +293,10 @@ func TestCreateVenueAsset_MissingAsset(t *testing.T) {
 // TestCreateVenueAsset_InvalidWithdrawalFee tests validation when withdrawal fee is invalid
 func TestCreateVenueAsset_InvalidWithdrawalFee(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create venue and asset
 	venue := createTestVenue("binance", "Binance")
@@ -322,10 +322,10 @@ func TestCreateVenueAsset_InvalidWithdrawalFee(t *testing.T) {
 // TestCreateVenueAsset_ExcessiveWithdrawalFee tests validation when withdrawal fee > 150%
 func TestCreateVenueAsset_ExcessiveWithdrawalFee(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create venue and asset
 	venue := createTestVenue("binance", "Binance")
@@ -351,10 +351,10 @@ func TestCreateVenueAsset_ExcessiveWithdrawalFee(t *testing.T) {
 // TestCreateVenueSymbol_Success tests successful venue symbol creation
 func TestCreateVenueSymbol_Success(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create venue, assets, and symbol
 	venue := createTestVenue("binance", "Binance")
@@ -379,10 +379,10 @@ func TestCreateVenueSymbol_Success(t *testing.T) {
 // TestCreateVenueSymbol_MissingVenue tests validation when venue doesn't exist
 func TestCreateVenueSymbol_MissingVenue(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create assets and symbol
 	btc := createTestAsset("asset_btc", "BTC")
@@ -407,10 +407,10 @@ func TestCreateVenueSymbol_MissingVenue(t *testing.T) {
 // TestCreateVenueSymbol_MissingSymbol tests validation when symbol doesn't exist
 func TestCreateVenueSymbol_MissingSymbol(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create only venue
 	venue := createTestVenue("binance", "Binance")
@@ -430,10 +430,10 @@ func TestCreateVenueSymbol_MissingSymbol(t *testing.T) {
 // TestCreateVenueSymbol_InvalidMakerFee tests validation when maker fee is invalid
 func TestCreateVenueSymbol_InvalidMakerFee(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create venue, assets, and symbol
 	venue := createTestVenue("binance", "Binance")
@@ -464,10 +464,10 @@ func TestCreateVenueSymbol_InvalidMakerFee(t *testing.T) {
 // TestCreateVenueSymbol_InvalidTakerFee tests validation when taker fee is invalid
 func TestCreateVenueSymbol_InvalidTakerFee(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create venue, assets, and symbol
 	venue := createTestVenue("binance", "Binance")
@@ -498,10 +498,10 @@ func TestCreateVenueSymbol_InvalidTakerFee(t *testing.T) {
 // TestGetVenueSymbol_Enriched tests getting venue symbol with enriched canonical symbol data
 func TestGetVenueSymbol_Enriched(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create venue, assets, and symbol
 	venue := createTestVenue("binance", "Binance")
@@ -533,10 +533,10 @@ func TestGetVenueSymbol_Enriched(t *testing.T) {
 // TestGetVenueSymbol_NotFound tests getting non-existent venue symbol
 func TestGetVenueSymbol_NotFound(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	vs, sym, err := venueMgr.GetVenueSymbol(context.Background(), "binance", "NONEXISTENT")
 
@@ -551,10 +551,10 @@ func TestGetVenueSymbol_NotFound(t *testing.T) {
 // TestListVenueAssets_ByVenue tests listing assets by venue (cqvx use case)
 func TestListVenueAssets_ByVenue(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create venue and assets
 	venue := createTestVenue("binance", "Binance")
@@ -585,10 +585,10 @@ func TestListVenueAssets_ByVenue(t *testing.T) {
 // TestListVenueAssets_ByAsset tests listing venues by asset ("which venues trade BTC?")
 func TestListVenueAssets_ByAsset(t *testing.T) {
 	mockRepo := newMockVenueRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
-	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
+	venueMgr := NewVenueManager(mockRepo, assetMgr, symbolMgr, nil)
 
 	// Create venues and asset
 	binance := createTestVenue("binance", "Binance")

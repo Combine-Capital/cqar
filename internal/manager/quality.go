@@ -12,13 +12,15 @@ import (
 
 // QualityManager handles business logic for quality flags and asset tradeability
 type QualityManager struct {
-	repo repository.Repository
+	repo           repository.Repository
+	eventPublisher *EventPublisher
 }
 
 // NewQualityManager creates a new QualityManager instance
-func NewQualityManager(repo repository.Repository) *QualityManager {
+func NewQualityManager(repo repository.Repository, eventPublisher *EventPublisher) *QualityManager {
 	return &QualityManager{
-		repo: repo,
+		repo:           repo,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -61,6 +63,11 @@ func (m *QualityManager) RaiseQualityFlag(ctx context.Context, flag *assetsv1.As
 	// Create the flag in the repository
 	if err := m.repo.RaiseQualityFlag(ctx, flag); err != nil {
 		return status.Error(codes.Internal, fmt.Sprintf("failed to raise quality flag: %v", err))
+	}
+
+	// Publish QualityFlagRaised event asynchronously
+	if m.eventPublisher != nil {
+		m.eventPublisher.PublishQualityFlagRaised(ctx, flag)
 	}
 
 	return nil

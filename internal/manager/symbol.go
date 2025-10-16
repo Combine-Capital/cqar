@@ -14,15 +14,17 @@ import (
 // SymbolManager handles business logic for symbol operations with validation
 // and market specification checking
 type SymbolManager struct {
-	repo         repository.Repository
-	assetManager *AssetManager
+	repo           repository.Repository
+	assetManager   *AssetManager
+	eventPublisher *EventPublisher
 }
 
 // NewSymbolManager creates a new SymbolManager instance
-func NewSymbolManager(repo repository.Repository, assetManager *AssetManager) *SymbolManager {
+func NewSymbolManager(repo repository.Repository, assetManager *AssetManager, eventPublisher *EventPublisher) *SymbolManager {
 	return &SymbolManager{
-		repo:         repo,
-		assetManager: assetManager,
+		repo:           repo,
+		assetManager:   assetManager,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -69,6 +71,11 @@ func (m *SymbolManager) CreateSymbol(ctx context.Context, symbol *marketsv1.Symb
 	// Create the symbol in the repository
 	if err := m.repo.CreateSymbol(ctx, symbol); err != nil {
 		return status.Error(codes.Internal, fmt.Sprintf("failed to create symbol: %v", err))
+	}
+
+	// Publish SymbolCreated event asynchronously
+	if m.eventPublisher != nil {
+		m.eventPublisher.PublishSymbolCreated(ctx, symbol)
 	}
 
 	return nil

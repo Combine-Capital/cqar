@@ -16,13 +16,15 @@ import (
 type AssetManager struct {
 	repo           repository.Repository
 	qualityManager *QualityManager
+	eventPublisher *EventPublisher
 }
 
 // NewAssetManager creates a new AssetManager instance
-func NewAssetManager(repo repository.Repository, qualityManager *QualityManager) *AssetManager {
+func NewAssetManager(repo repository.Repository, qualityManager *QualityManager, eventPublisher *EventPublisher) *AssetManager {
 	return &AssetManager{
 		repo:           repo,
 		qualityManager: qualityManager,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -54,6 +56,11 @@ func (m *AssetManager) CreateAsset(ctx context.Context, asset *assetsv1.Asset) e
 	// Create the asset in the repository
 	if err := m.repo.CreateAsset(ctx, asset); err != nil {
 		return status.Error(codes.Internal, fmt.Sprintf("failed to create asset: %v", err))
+	}
+
+	// Publish AssetCreated event asynchronously
+	if m.eventPublisher != nil {
+		m.eventPublisher.PublishAssetCreated(ctx, asset)
 	}
 
 	return nil
@@ -186,6 +193,11 @@ func (m *AssetManager) CreateAssetDeployment(ctx context.Context, deployment *as
 		return status.Error(codes.Internal, fmt.Sprintf("failed to create asset deployment: %v", err))
 	}
 
+	// Publish AssetDeploymentCreated event asynchronously
+	if m.eventPublisher != nil {
+		m.eventPublisher.PublishAssetDeploymentCreated(ctx, deployment)
+	}
+
 	return nil
 }
 
@@ -253,6 +265,11 @@ func (m *AssetManager) CreateAssetRelationship(ctx context.Context, relationship
 	// Create the relationship
 	if err := m.repo.CreateAssetRelationship(ctx, relationship); err != nil {
 		return status.Error(codes.Internal, fmt.Sprintf("failed to create asset relationship: %v", err))
+	}
+
+	// Publish RelationshipEstablished event asynchronously
+	if m.eventPublisher != nil {
+		m.eventPublisher.PublishRelationshipEstablished(ctx, relationship)
 	}
 
 	return nil
@@ -335,7 +352,7 @@ func (m *AssetManager) CreateAssetGroup(ctx context.Context, group *assetsv1.Ass
 	}
 
 	// Validate that all member assets exist before creating the group
-	if group.Members != nil && len(group.Members) > 0 {
+	if len(group.Members) > 0 {
 		for _, member := range group.Members {
 			if member.AssetId == nil || *member.AssetId == "" {
 				return status.Error(codes.InvalidArgument, "member asset_id is required")

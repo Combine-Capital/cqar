@@ -112,9 +112,9 @@ func createTestAsset(id, symbol string) *assetsv1.Asset {
 // TestCreateSymbol_Success tests successful symbol creation
 func TestCreateSymbol_Success(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets first
 	btcID := "asset_btc"
@@ -133,9 +133,9 @@ func TestCreateSymbol_Success(t *testing.T) {
 // TestCreateSymbol_MissingBaseAsset tests validation when base_asset_id doesn't exist
 func TestCreateSymbol_MissingBaseAsset(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create only quote asset
 	usdtID := "asset_usdt"
@@ -155,9 +155,9 @@ func TestCreateSymbol_MissingBaseAsset(t *testing.T) {
 // TestCreateSymbol_MissingQuoteAsset tests validation when quote_asset_id doesn't exist
 func TestCreateSymbol_MissingQuoteAsset(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create only base asset
 	btcID := "asset_btc"
@@ -177,9 +177,9 @@ func TestCreateSymbol_MissingQuoteAsset(t *testing.T) {
 // TestCreateSymbol_InvalidTickSize tests validation when tick_size <= 0
 func TestCreateSymbol_InvalidTickSize(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -204,9 +204,9 @@ func TestCreateSymbol_InvalidTickSize(t *testing.T) {
 // TestCreateSymbol_InvalidLotSize tests validation when lot_size <= 0
 func TestCreateSymbol_InvalidLotSize(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -231,9 +231,9 @@ func TestCreateSymbol_InvalidLotSize(t *testing.T) {
 // TestCreateSymbol_MinOrderSizeGreaterThanMax tests validation when min_order_size >= max_order_size
 func TestCreateSymbol_MinOrderSizeGreaterThanMax(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -261,9 +261,9 @@ func TestCreateSymbol_MinOrderSizeGreaterThanMax(t *testing.T) {
 // TestCreateSymbol_OptionWithoutStrikePrice tests validation when option type lacks strike_price
 func TestCreateSymbol_OptionWithoutStrikePrice(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -289,9 +289,9 @@ func TestCreateSymbol_OptionWithoutStrikePrice(t *testing.T) {
 // TestCreateSymbol_OptionWithInvalidStrikePrice tests validation when strike_price <= 0
 func TestCreateSymbol_OptionWithInvalidStrikePrice(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -321,9 +321,9 @@ func TestCreateSymbol_OptionWithInvalidStrikePrice(t *testing.T) {
 // TestCreateSymbol_OptionWithoutExpiry tests validation when option type lacks expiry
 func TestCreateSymbol_OptionWithoutExpiry(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -351,9 +351,9 @@ func TestCreateSymbol_OptionWithoutExpiry(t *testing.T) {
 // TestCreateSymbol_OptionWithPastExpiry tests validation when expiry is in the past
 func TestCreateSymbol_OptionWithPastExpiry(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -383,9 +383,9 @@ func TestCreateSymbol_OptionWithPastExpiry(t *testing.T) {
 // TestCreateSymbol_OptionWithoutOptionType tests validation when option type lacks option_type field
 func TestCreateSymbol_OptionWithoutOptionType(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -414,9 +414,9 @@ func TestCreateSymbol_OptionWithoutOptionType(t *testing.T) {
 // TestCreateSymbol_OptionSuccess tests successful option symbol creation
 func TestCreateSymbol_OptionSuccess(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -443,9 +443,9 @@ func TestCreateSymbol_OptionSuccess(t *testing.T) {
 // TestListSymbols_FilterByType tests listing symbols filtered by type
 func TestListSymbols_FilterByType(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets
 	btcID := "asset_btc"
@@ -482,9 +482,9 @@ func TestListSymbols_FilterByType(t *testing.T) {
 // TestGetSymbol_NotFound tests getting a non-existent symbol
 func TestGetSymbol_NotFound(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	symbol, err := symbolMgr.GetSymbol(context.Background(), "nonexistent")
 
@@ -498,9 +498,9 @@ func TestGetSymbol_NotFound(t *testing.T) {
 // TestUpdateSymbol_Success tests successful symbol update
 func TestUpdateSymbol_Success(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets and symbol
 	btcID := "asset_btc"
@@ -524,9 +524,9 @@ func TestUpdateSymbol_Success(t *testing.T) {
 // TestDeleteSymbol_Success tests successful symbol deletion
 func TestDeleteSymbol_Success(t *testing.T) {
 	mockRepo := newMockSymbolRepository()
-	qualityMgr := NewQualityManager(mockRepo)
-	assetMgr := NewAssetManager(mockRepo, qualityMgr)
-	symbolMgr := NewSymbolManager(mockRepo, assetMgr)
+	qualityMgr := NewQualityManager(mockRepo, nil)
+	assetMgr := NewAssetManager(mockRepo, qualityMgr, nil)
+	symbolMgr := NewSymbolManager(mockRepo, assetMgr, nil)
 
 	// Create test assets and symbol
 	btcID := "asset_btc"

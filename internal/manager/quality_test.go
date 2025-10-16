@@ -14,7 +14,7 @@ import (
 func TestQualityManager_RaiseQualityFlag_Validation(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	mgr := NewQualityManager(repo)
+	mgr := NewQualityManager(repo, nil)
 
 	// Setup: Create an asset
 	asset := &assetsv1.Asset{
@@ -139,7 +139,7 @@ func TestQualityManager_RaiseQualityFlag_Validation(t *testing.T) {
 func TestQualityManager_IsAssetTradeable_CRITICAL(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	mgr := NewQualityManager(repo)
+	mgr := NewQualityManager(repo, nil)
 
 	// Setup: Create an asset
 	asset := &assetsv1.Asset{
@@ -203,7 +203,7 @@ func TestQualityManager_IsAssetTradeable_CRITICAL(t *testing.T) {
 func TestQualityManager_IsAssetTradeable_MultipleSeverities(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	mgr := NewQualityManager(repo)
+	mgr := NewQualityManager(repo, nil)
 
 	// Setup: Create an asset
 	asset := &assetsv1.Asset{
@@ -265,7 +265,7 @@ func TestQualityManager_IsAssetTradeable_MultipleSeverities(t *testing.T) {
 func TestQualityManager_ResolveQualityFlag(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	mgr := NewQualityManager(repo)
+	mgr := NewQualityManager(repo, nil)
 
 	// Setup: Create asset and flag
 	asset := &assetsv1.Asset{
@@ -318,7 +318,7 @@ func TestQualityManager_ResolveQualityFlag(t *testing.T) {
 func TestQualityManager_ResolveQualityFlag_Validation(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRepository()
-	mgr := NewQualityManager(repo)
+	mgr := NewQualityManager(repo, nil)
 
 	tests := []struct {
 		name            string
