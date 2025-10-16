@@ -1070,12 +1070,72 @@ cqar/
 
 **Key Directories:**
 - `cmd/server/`: Service entrypoint, single binary
+- `cmd/bootstrap/`: Data seeding utility (separate from service runtime)
 - `internal/`: All implementation code (not importable by other services)
 - `internal/server/`: gRPC server implementation
 - `internal/manager/`: Business logic layer (domain validation, orchestration)
 - `internal/repository/`: Data access layer (PostgreSQL + Redis)
 - `test/integration/`: End-to-end tests with real infrastructure
 - `migrations/`: Database schema versioning
+
+## Data Bootstrap Component
+
+**Purpose:** Seed CQAR database with initial production data from authoritative sources
+
+**Component Location:**
+```
+cmd/
+└── bootstrap/
+    └── main.go                    # Bootstrap CLI utility
+```
+
+**Data Sources:**
+- **Coinbase Top 100**: Authoritative source for initial asset list
+- **CoinGecko API**: Asset deployment information (contract addresses, chain deployments, metadata)
+
+**Architecture:**
+- Separate CLI utility (not part of service runtime)
+- Uses CQAR gRPC client to seed data (CQRS pattern)
+- Connects to running CQAR service instance
+- Validates data before insertion (never hallucinates)
+
+**Bootstrap Workflow:**
+1. Fetch Coinbase Top 100 asset list (symbol, name, type)
+2. For each asset, query CoinGecko API for:
+   - Contract addresses on supported chains (Ethereum, Polygon, BSC, etc.)
+   - Decimals per deployment
+   - Basic metadata (description, logo URL, website)
+3. Create chains if not exist (Ethereum, Polygon, Solana, Bitcoin, etc.)
+4. For each asset:
+   - Call CreateAsset via gRPC
+   - For each deployment: Call CreateAssetDeployment via gRPC
+5. Skip assets with incomplete/unverifiable data
+
+**Error Handling:**
+- Log skipped assets with reason (missing contract, unverified data)
+- Continue on individual asset failure (don't abort entire process)
+- Report summary: successful, failed, skipped
+
+**Configuration:**
+```yaml
+bootstrap:
+  cqar_grpc_endpoint: "localhost:9090"
+  coinbase_api_key: "<optional>"
+  coingecko_api_key: "<required>"
+  rate_limit_per_second: 10  # CoinGecko rate limiting
+  chains:
+    - ethereum
+    - polygon
+    - bsc
+    - solana
+    - bitcoin
+```
+
+**Future Enhancements (Post-MVP):**
+- Incremental updates (don't re-create existing assets)
+- Relationship detection (WETH/ETH, stablecoins)
+- Quality flag integration (scam detection via external APIs)
+- Dry-run mode for validation
 
 ## Integration Patterns
 

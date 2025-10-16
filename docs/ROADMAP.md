@@ -19,6 +19,9 @@
 - [x] **Commit 11**: Cache Layer Integration
 - [x] **Commit 12**: Integration Tests & Validation
 - [x] **Commit 13**: Documentation & Deployment Configuration
+- [ ] **Commit 14**: Bootstrap CLI Tool - Infrastructure & API Clients
+- [ ] **Commit 15**: Bootstrap CLI Tool - Asset Seeding Logic
+- [ ] **Commit 16**: Bootstrap CLI Tool - Deployment Seeding & Validation
 
 ---
 
@@ -579,3 +582,167 @@ grpcurl -plaintext localhost:9090 AssetRegistry/GetAsset
 - **Integration Tests**: Full workflows with real infrastructure (Commit 12)
 - **Performance Tests**: Cache latency, database query latency (Commit 12)
 - **E2E Tests**: User persona workflows (cqmd, cqpm, cqvx) (Commit 12)
+
+---
+
+## Post-MVP: Data Bootstrap Feature
+
+### Commit 14: Bootstrap CLI Tool - Infrastructure & API Clients
+
+**Goal**: Create bootstrap CLI utility with external API clients (Coinbase, CoinGecko).
+**Depends**: Commit 13
+
+**Deliverables**:
+- [ ] `cmd/bootstrap/main.go` with CLI entrypoint, flag parsing (--config, --dry-run, --limit)
+- [ ] `internal/bootstrap/config.go` with bootstrap-specific config (API keys, rate limits, chain list)
+- [ ] `internal/bootstrap/client/coinbase.go` with Coinbase API client for Top 100 assets
+- [ ] `internal/bootstrap/client/coingecko.go` with CoinGecko API client (asset details, deployments)
+- [ ] `internal/bootstrap/client/cqar.go` with CQAR gRPC client wrapper (CreateAsset, CreateAssetDeployment, CreateChain)
+- [ ] Rate limiting: 10 requests/second for CoinGecko (free tier limit)
+- [ ] Error handling: retry with exponential backoff for transient failures
+- [ ] `config.bootstrap.yaml` with API endpoints, keys, chain configuration
+
+**Success**:
+- `go build -o bin/bootstrap ./cmd/bootstrap` produces bootstrap binary
+- `./bin/bootstrap --help` displays usage information with all flags
+- Coinbase client successfully fetches Top 100 asset list (symbol, name, rank)
+- CoinGecko client successfully fetches asset details by ID (contract addresses, decimals, metadata)
+- CQAR gRPC client successfully connects to running CQAR service
+- Rate limiting prevents API throttling (10 req/s measured via metrics)
+
+---
+
+### Commit 15: Bootstrap CLI Tool - Asset Seeding Logic
+
+**Goal**: Implement asset and chain seeding logic with data validation.
+**Depends**: Commit 14
+
+**Deliverables**:
+- [ ] `internal/bootstrap/seeder/chain.go` with SeedChains function (Ethereum, Polygon, BSC, Solana, Bitcoin, Arbitrum, Optimism)
+- [ ] `internal/bootstrap/seeder/asset.go` with SeedAssets function
+- [ ] Asset seeding workflow:
+  1. Fetch Coinbase Top 100 list
+  2. For each asset: query CoinGecko for details
+  3. Validate data completeness (symbol, name, type required)
+  4. Call CQAR CreateAsset gRPC method
+  5. Log result (success/failure/skipped with reason)
+- [ ] Data validation rules:
+  - Skip assets with missing symbol or name (CRITICAL: no hallucination)
+  - Skip assets with unverified contract addresses
+  - Normalize asset type (CRYPTOCURRENCY, TOKEN, STABLECOIN, NFT)
+- [ ] `internal/bootstrap/types.go` with data structures (AssetData, ChainData, DeploymentData)
+- [ ] Logging: structured logs with progress (10/100 assets processed), errors, warnings
+- [ ] Summary report: total processed, succeeded, failed, skipped with reasons
+
+**Success**:
+- `./bin/bootstrap --config config.bootstrap.yaml` executes without crashes
+- Chains seeded: Ethereum, Polygon, BSC, Solana, Bitcoin created via CreateChain
+- Assets seeded: ≥80 of Top 100 assets created (≤20 skipped for missing data is acceptable)
+- Logs include: "Processing asset BTC (1/100)", "Created asset: BTC (id: abc-123)", "Skipped asset XYZ: missing contract address"
+- Summary report: "Processed: 100, Succeeded: 85, Failed: 5, Skipped: 10"
+- Database contains: 7 chains, 85 assets with correct symbols, names, types
+- Dry-run mode (`--dry-run`) logs actions without creating entities
+
+---
+
+### Commit 16: Bootstrap CLI Tool - Deployment Seeding & Validation
+
+**Goal**: Implement asset deployment seeding with contract address validation.
+**Depends**: Commit 15
+
+**Deliverables**:
+- [ ] `internal/bootstrap/seeder/deployment.go` with SeedDeployments function
+- [ ] Deployment seeding workflow:
+  1. For each asset from Commit 15: query CoinGecko platforms API
+  2. Extract contract addresses per chain (ethereum, polygon-pos, binance-smart-chain, solana)
+  3. Validate contract address format per chain (0x... for EVM, base58 for Solana)
+  4. Validate decimals: 0-18 range, default to 18 for native tokens
+  5. Set is_canonical flag: true for primary deployment, false for bridged
+  6. Call CQAR CreateAssetDeployment gRPC method
+  7. Log result (success/failure/skipped with reason)
+- [ ] Contract address validation:
+  - EVM chains (Ethereum, Polygon, BSC, Arbitrum, Optimism): 0x-prefixed 40-char hex
+  - Solana: base58 string, 32-44 characters
+  - Bitcoin: native asset (no contract address)
+  - Skip deployments with malformed addresses
+- [ ] Limit mode (`--limit N`): process only first N assets for testing
+- [ ] Idempotency: skip existing assets/deployments (check via GetAsset, GetAssetDeployment)
+- [ ] Error recovery: continue on individual deployment failure, don't abort
+
+**Success**:
+- `./bin/bootstrap --config config.bootstrap.yaml --limit 10` seeds 10 assets with deployments
+- Deployments created: USDC on Ethereum, Polygon, BSC (3 deployments for 1 asset)
+- Contract address validation: 0x-prefixed addresses accepted, malformed addresses skipped
+- Logs include: "Created deployment: USDC on Ethereum (contract: 0xa0b8...)"
+- Database contains: ≥100 asset deployments across 7 chains
+- Idempotency test: re-running bootstrap skips existing assets (logs "Asset BTC already exists")
+- Error recovery: if deployment fails, next deployment continues
+- Bootstrap completes full run in <10 minutes for Top 100 assets
+
+---
+
+## Bootstrap Validation Commands
+
+**Commit 14**:
+```bash
+go build -o bin/bootstrap ./cmd/bootstrap
+./bin/bootstrap --help
+./bin/bootstrap --dry-run --limit 5  # Test first 5 assets
+```
+
+**Commit 15**:
+```bash
+make migrate-up  # Ensure CQAR database ready
+make run &       # Start CQAR service
+./bin/bootstrap --config config.bootstrap.yaml --dry-run
+./bin/bootstrap --config config.bootstrap.yaml --limit 10
+psql -h localhost -U cqar -d cqar -c "SELECT COUNT(*) FROM assets;"
+psql -h localhost -U cqar -d cqar -c "SELECT symbol, name, type FROM assets LIMIT 10;"
+pkill cqar
+```
+
+**Commit 16**:
+```bash
+./bin/bootstrap --config config.bootstrap.yaml --limit 20
+psql -h localhost -U cqar -d cqar -c "SELECT COUNT(*) FROM deployments;"
+psql -h localhost -U cqar -d cqar -c "SELECT a.symbol, c.name, d.contract_address FROM deployments d JOIN assets a ON d.asset_id = a.id JOIN chains c ON d.chain_id = c.id LIMIT 20;"
+# Verify USDC has multiple deployments
+psql -h localhost -U cqar -d cqar -c "SELECT c.name, d.contract_address FROM deployments d JOIN chains c ON d.chain_id = c.id WHERE d.asset_id = (SELECT id FROM assets WHERE symbol = 'USDC');"
+```
+
+---
+
+## Bootstrap Implementation Notes
+
+### Data Integrity
+- **CRITICAL**: Never hallucinate data - if contract address is missing/unverified, skip deployment
+- Validate all data against source APIs (Coinbase, CoinGecko)
+- Log all skipped assets with specific reasons for audit trail
+
+### API Rate Limiting
+- CoinGecko free tier: 10-50 requests/minute
+- Implement exponential backoff: 1s, 2s, 4s, 8s on 429 (rate limit exceeded)
+- Add configurable rate limit (default 10 req/s)
+
+### Idempotency
+- Check if asset exists before CreateAsset (GetAsset by symbol)
+- Check if deployment exists before CreateAssetDeployment (ListAssetDeployments filter by asset_id + chain_id)
+- Safe to re-run bootstrap without duplicates
+
+### Chain Mapping
+| CoinGecko Platform ID | CQAR Chain Name | Chain Type |
+| --------------------- | --------------- | ---------- |
+| ethereum              | Ethereum        | EVM        |
+| polygon-pos           | Polygon         | EVM        |
+| binance-smart-chain   | BSC             | EVM        |
+| solana                | Solana          | NON_EVM    |
+| bitcoin               | Bitcoin         | UTXO       |
+| arbitrum-one          | Arbitrum        | EVM        |
+| optimistic-ethereum   | Optimism        | EVM        |
+
+### Future Enhancements (Post-Bootstrap)
+- Incremental updates: daily sync for new assets
+- Relationship detection: auto-create WRAPS (WETH/ETH), BRIDGES (USDC.e/USDC)
+- Quality flag integration: scam detection via Token Sniffer API
+- Symbol availability: seed venue_assets, venue_symbols from exchange APIs
+- Metadata enrichment: logos, descriptions, social links

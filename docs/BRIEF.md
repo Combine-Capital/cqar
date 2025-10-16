@@ -130,6 +130,15 @@ This service depends on two foundational CQ platform packages:
 - [MVP] Tracing: OpenTelemetry with automatic span creation
 - [MVP] Configuration: viper-based from environment + YAML with validation
 
+### Data Bootstrap (Initial Seeding)
+- [MVP] Bootstrap process for seeding CQAR database with initial production data
+- [MVP] Use Coinbase Top 100 as authoritative source for initial assets
+- [MVP] Use CoinGecko API for asset deployment information (contract addresses, chain deployments)
+- [MVP] Leverage existing CQAR service (CQRS pattern) to seed data via gRPC calls
+- [MVP] CRITICAL: Only include verified data - never hallucinate or guess information
+- [MVP] Seed minimal viable dataset: assets, deployments, chains, basic metadata
+- [MVP] Bootstrap tool runs as separate CLI utility, not part of service runtime
+
 ### Post-MVP
 - External metadata sync (CoinGecko, DeFiLlama, Token Lists)
 - Auto-detect suspicious tokens via contract analysis
