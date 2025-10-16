@@ -9,7 +9,11 @@
 - [x] **Commit 6**: Repository Layer - Venue & Mapping Domain
 - [x] **Commit 7**: Business Logic - Asset Management
 - [x] **Commit 8**: Business Logic - Symbol & Venue Management
-- [ ] **Commit 9**: gRPC Server & Service Integration
+- [x] **Commit 9a**: gRPC Server - Core Asset Methods
+- [ ] **Commit 9b**: gRPC Server - Asset Deployment & Relationship Methods
+- [ ] **Commit 9c**: gRPC Server - Quality, Chain, Symbol, Venue Methods
+- [ ] **Commit 9d**: CQI Service Integration
+- [ ] **Commit 9e**: gRPC Middleware Chain
 - [ ] **Commit 10**: Event Publishing System
 - [ ] **Commit 11**: Cache Layer Integration
 - [ ] **Commit 12**: Integration Tests & Validation
@@ -205,28 +209,106 @@
 
 ---
 
-### Commit 9: gRPC Server & Service Integration
+### Commit 9a: gRPC Server - Core Asset Methods
 
-**Goal**: Implement gRPC server exposing AssetRegistry interface with CQI service lifecycle.
+**Goal**: Implement gRPC server with core asset CRUD operations.
 **Depends**: Commit 7, Commit 8
 
 **Deliverables**:
-- [ ] `internal/server/server.go` implementing all AssetRegistry gRPC methods from CQC interface
-- [ ] Server struct embeds `pb.UnimplementedAssetRegistryServer` and holds manager dependencies
-- [ ] All gRPC methods (48 total) call corresponding manager methods and wrap errors with status.Error()
-- [ ] gRPC methods translate validation errors to INVALID_ARGUMENT, not found to NOT_FOUND, panics to INTERNAL
+- [x] `internal/server/server.go` with AssetRegistryServer struct
+- [x] Server embeds `servicesv1.UnimplementedAssetRegistryServer` for forward compatibility
+- [x] Server holds manager dependencies: AssetManager, SymbolManager, VenueManager, QualityManager, Repository
+- [x] Implement 6 core asset methods: CreateAsset, GetAsset, UpdateAsset, DeleteAsset, ListAssets, SearchAssets
+- [x] All methods wrap manager errors with status.Error() and appropriate gRPC codes (INVALID_ARGUMENT, NOT_FOUND, INTERNAL)
+- [x] Helper functions: derefString, derefInt32, ptrBool for pointer field handling
+- [x] Request field validation before calling managers (required fields)
+
+**Success**:
+- ✅ `go build ./internal/server` compiles successfully
+- ✅ Server struct correctly embeds UnimplementedAssetRegistryServer
+- ✅ All 6 methods have correct signatures matching CQC AssetRegistry interface
+- ✅ Field mappings correct: request fields → Asset domain object → manager call
+
+---
+
+### Commit 9b: gRPC Server - Asset Deployment & Relationship Methods
+
+**Goal**: Add asset deployment, identifier, relationship, and group gRPC methods.
+**Depends**: Commit 9a
+
+**Deliverables**:
+- [ ] Add 3 deployment methods: CreateAssetDeployment, GetAssetDeployment, ListAssetDeployments
+- [ ] Add 2 relationship methods: CreateAssetRelationship, ListAssetRelationships
+- [ ] Add 4 group methods: CreateAssetGroup, GetAssetGroup, AddAssetToGroup, RemoveAssetFromGroup
+- [ ] Handle DeploymentFilter for ListAssetDeployments (filter by asset_id)
+- [ ] Handle RelationshipFilter for ListAssetRelationships (filter by asset_id)
+- [ ] All methods follow same error wrapping pattern as Commit 9a
+
+**Success**:
+- `go build ./internal/server` compiles successfully
+- All 9 additional methods have correct signatures
+- DeploymentFilter and RelationshipFilter correctly constructed from requests
+
+---
+
+### Commit 9c: gRPC Server - Quality, Chain, Symbol, Venue Methods
+
+**Goal**: Complete remaining gRPC methods for quality flags, chains, symbols, and venues.
+**Depends**: Commit 9b
+
+**Deliverables**:
+- [ ] Add 3 quality flag methods: RaiseQualityFlag, ResolveQualityFlag, ListQualityFlags
+- [ ] Add 3 chain methods: CreateChain, GetChain, ListChains
+- [ ] Add 9 symbol methods: CreateSymbol, GetSymbol, UpdateSymbol, DeleteSymbol, ListSymbols, SearchSymbols, CreateSymbolIdentifier, GetSymbolIdentifier, ListSymbolIdentifiers
+- [ ] Add 9 venue methods: CreateVenue, GetVenue, ListVenues, CreateVenueAsset, GetVenueAsset, ListVenueAssets, CreateVenueSymbol, GetVenueSymbol, ListVenueSymbols
+- [ ] All methods call appropriate manager/repository methods
+- [ ] Stub unimplemented identifier methods with status.Error(codes.Unimplemented) if not backed by managers
+
+**Success**:
+- `go build ./internal/server` compiles successfully
+- All 24 methods implemented (total 39 methods across 9a+9b+9c)
+- Server implements complete AssetRegistry gRPC interface
+
+---
+
+### Commit 9d: CQI Service Integration
+
+**Goal**: Integrate gRPC server with CQI service lifecycle.
+**Depends**: Commit 9c
+
+**Deliverables**:
 - [ ] `internal/service/service.go` implementing cqi.Service interface (Start, Stop, Name, Health)
-- [ ] Service.Start initializes database pool, managers, gRPC server, HTTP server (health endpoints)
-- [ ] Service.Stop implements graceful shutdown with 30s timeout, closes database/cache connections
-- [ ] `cmd/server/main.go` uses CQI bootstrap to load config, initialize logging/metrics/tracing, start service
-- [ ] gRPC middleware chain: auth → logging → metrics → tracing applied to all methods
+- [ ] Service.Start initializes: database pool → repository → managers → gRPC server → HTTP health server
+- [ ] Service.Stop implements graceful shutdown: stop accepting requests → drain in-flight → close connections (30s timeout)
+- [ ] `cmd/server/main.go` uses CQI bootstrap to load config, initialize logging/metrics/tracing
+- [ ] main.go handles SIGINT/SIGTERM for graceful shutdown
+- [ ] Health endpoints: /health/live (liveness), /health/ready (readiness with component checks)
 
 **Success**:
 - `make run` starts service, logs "gRPC server listening on :9090"
 - `grpcurl localhost:9090 list` shows AssetRegistry service methods
-- `grpcurl -d '{"symbol":"BTC"}' localhost:9090 AssetRegistry.CreateAsset` returns valid UUID
 - Health check: `curl localhost:8080/health/ready` returns 200 with component status
-- SIGTERM triggers graceful shutdown, closes connections cleanly
+- SIGTERM triggers graceful shutdown, logs "shutting down gracefully"
+
+---
+
+### Commit 9e: gRPC Middleware Chain
+
+**Goal**: Add production-ready gRPC middleware for auth, logging, metrics, tracing.
+**Depends**: Commit 9d
+
+**Deliverables**:
+- [ ] gRPC unary interceptor chain: auth → logging → metrics → tracing
+- [ ] Auth interceptor validates API keys (or placeholder for now)
+- [ ] Logging interceptor logs method name, duration, error status
+- [ ] Metrics interceptor records histogram: `cqar_grpc_request_duration_seconds{method, status}`
+- [ ] Tracing interceptor integrates with CQI OpenTelemetry setup
+- [ ] Apply interceptor chain to gRPC server in service.Start
+
+**Success**:
+- `grpcurl -d '{"symbol":"BTC"}' localhost:9090 cqc.services.v1.AssetRegistry.CreateAsset` logs request/response
+- Prometheus metrics: `curl localhost:8080/metrics | grep cqar_grpc_request_duration_seconds` shows histogram
+- Logs include trace_id for distributed tracing correlation
 
 ---
 
