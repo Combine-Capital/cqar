@@ -47,6 +47,11 @@ func ValidateContractAddress(contractAddress string, chainType string) error {
 		return fmt.Errorf("contract_address is required")
 	}
 
+	// Allow "native" for native blockchain tokens
+	if contractAddress == "native" {
+		return nil
+	}
+
 	// Normalize chain type
 	chainType = strings.ToUpper(chainType)
 

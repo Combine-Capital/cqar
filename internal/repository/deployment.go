@@ -6,6 +6,7 @@ import (
 	"time"
 
 	assetsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/assets/v1"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -34,8 +35,8 @@ func (r *PostgresRepository) CreateAssetDeployment(ctx context.Context, deployme
 
 	// Generate ID if not provided
 	if deployment.DeploymentId == nil || *deployment.DeploymentId == "" {
-		// Use format: {chain}:{address}
-		id := fmt.Sprintf("%s:%s", deployment.GetChainId(), deployment.GetAddress())
+		// Generate a new UUID
+		id := uuid.New().String()
 		deployment.DeploymentId = &id
 	}
 

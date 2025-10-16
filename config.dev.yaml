@@ -4,8 +4,28 @@
 service:
   env: "development"
 
+server:
+  grpc_port: 9090
+  http_port: 8080
+
 database:
-  database: "cqar_dev"
+  host: "localhost"
+  port: 5432
+  user: "cqar"
+  password: "cqar_dev_password"
+  database: "cqar"
+  ssl_mode: "disable"
+
+cache:
+  host: "localhost"
+  port: 6379
+  password: "cqar_dev_password"
+
+eventbus:
+  backend: "jetstream"
+  servers:
+    - "nats://localhost:4222"
+  stream_name: "cqc_events"
 
 log:
   level: "debug"

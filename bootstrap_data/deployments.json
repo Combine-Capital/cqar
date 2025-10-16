@@ -1,0 +1,149 @@
+[
+  {
+    "asset_symbol": "ETH",
+    "chain_id": "ethereum",
+    "contract_address": "0x0000000000000000000000000000000000000000",
+    "decimals": 18,
+    "is_native": true
+  },
+  {
+    "asset_symbol": "ETH",
+    "chain_id": "polygon_pos",
+    "contract_address": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
+    "decimals": 18,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "ETH",
+    "chain_id": "binance_smart_chain",
+    "contract_address": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+    "decimals": 18,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "ETH",
+    "chain_id": "arbitrum_one",
+    "contract_address": "0x0000000000000000000000000000000000000000",
+    "decimals": 18,
+    "is_native": true
+  },
+  {
+    "asset_symbol": "ETH",
+    "chain_id": "optimism",
+    "contract_address": "0x0000000000000000000000000000000000000000",
+    "decimals": 18,
+    "is_native": true
+  },
+  {
+    "asset_symbol": "USDT",
+    "chain_id": "ethereum",
+    "contract_address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    "decimals": 6,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "USDT",
+    "chain_id": "polygon_pos",
+    "contract_address": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+    "decimals": 6,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "USDT",
+    "chain_id": "binance_smart_chain",
+    "contract_address": "0x55d398326f99059fF775485246999027B3197955",
+    "decimals": 18,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "USDT",
+    "chain_id": "arbitrum_one",
+    "contract_address": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+    "decimals": 6,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "USDT",
+    "chain_id": "optimism",
+    "contract_address": "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
+    "decimals": 6,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "BNB",
+    "chain_id": "binance_smart_chain",
+    "contract_address": "0x0000000000000000000000000000000000000000",
+    "decimals": 18,
+    "is_native": true
+  },
+  {
+    "asset_symbol": "BNB",
+    "chain_id": "ethereum",
+    "contract_address": "0xB8c77482e45F1F44dE1745F52C74426C631bDD52",
+    "decimals": 18,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "SOL",
+    "chain_id": "solana",
+    "contract_address": "So11111111111111111111111111111111111111112",
+    "decimals": 9,
+    "is_native": true
+  },
+  {
+    "asset_symbol": "USDC",
+    "chain_id": "ethereum",
+    "contract_address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "decimals": 6,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "USDC",
+    "chain_id": "polygon_pos",
+    "contract_address": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+    "decimals": 6,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "USDC",
+    "chain_id": "binance_smart_chain",
+    "contract_address": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+    "decimals": 18,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "USDC",
+    "chain_id": "arbitrum_one",
+    "contract_address": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+    "decimals": 6,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "USDC",
+    "chain_id": "optimism",
+    "contract_address": "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
+    "decimals": 6,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "USDC",
+    "chain_id": "solana",
+    "contract_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "decimals": 6,
+    "is_native": false
+  },
+  {
+    "asset_symbol": "BTC",
+    "chain_id": "bitcoin",
+    "contract_address": "native",
+    "decimals": 8,
+    "is_native": true
+  },
+  {
+    "asset_symbol": "DOGE",
+    "chain_id": "dogecoin",
+    "contract_address": "native",
+    "decimals": 8,
+    "is_native": true
+  }
+]

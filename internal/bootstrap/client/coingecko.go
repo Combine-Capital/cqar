@@ -192,6 +192,12 @@ func GetPlatformInfo(details *AssetDetails) []PlatformInfo {
 			continue
 		}
 
+		// Some CoinGecko responses include platform prefix (e.g., "ethereum:0x...")
+		// Strip the prefix if present
+		if idx := strings.Index(contractAddress, ":"); idx != -1 {
+			contractAddress = contractAddress[idx+1:]
+		}
+
 		platforms = append(platforms, PlatformInfo{
 			ChainID:         chainID,
 			ContractAddress: contractAddress,

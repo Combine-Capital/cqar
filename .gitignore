@@ -18,6 +18,11 @@ go.sum
 .vscode/
 *.swp
 *.swo
+
+# Local configuration overrides (contains API keys)
+config.local.yaml
+config.bootstrap.local.yaml
+*.local.yaml
 *~
 
 # OS

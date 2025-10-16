@@ -1,0 +1,77 @@
+[
+    {
+        "chain_id": "ethereum",
+        "name": "Ethereum",
+        "chain_type": "EVM",
+        "native_asset_symbol": "ETH",
+        "rpc_urls": [
+            "https://eth.llamarpc.com",
+            "https://rpc.ankr.com/eth"
+        ],
+        "block_explorer_url": "https://etherscan.io"
+    },
+    {
+        "chain_id": "bitcoin",
+        "name": "Bitcoin",
+        "chain_type": "UTXO",
+        "native_asset_symbol": "BTC",
+        "rpc_urls": [
+            "https://blockstream.info/api"
+        ],
+        "block_explorer_url": "https://blockstream.info"
+    },
+    {
+        "chain_id": "solana",
+        "name": "Solana",
+        "chain_type": "NON_EVM",
+        "native_asset_symbol": "SOL",
+        "rpc_urls": [
+            "https://api.mainnet-beta.solana.com"
+        ],
+        "block_explorer_url": "https://solscan.io"
+    },
+    {
+        "chain_id": "polygon_pos",
+        "name": "Polygon",
+        "chain_type": "EVM",
+        "native_asset_symbol": "MATIC",
+        "rpc_urls": [
+            "https://polygon-rpc.com",
+            "https://rpc.ankr.com/polygon"
+        ],
+        "block_explorer_url": "https://polygonscan.com"
+    },
+    {
+        "chain_id": "binance_smart_chain",
+        "name": "BNB Smart Chain",
+        "chain_type": "EVM",
+        "native_asset_symbol": "BNB",
+        "rpc_urls": [
+            "https://bsc-dataseed.binance.org",
+            "https://rpc.ankr.com/bsc"
+        ],
+        "block_explorer_url": "https://bscscan.com"
+    },
+    {
+        "chain_id": "arbitrum_one",
+        "name": "Arbitrum One",
+        "chain_type": "EVM",
+        "native_asset_symbol": "ETH",
+        "rpc_urls": [
+            "https://arb1.arbitrum.io/rpc",
+            "https://rpc.ankr.com/arbitrum"
+        ],
+        "block_explorer_url": "https://arbiscan.io"
+    },
+    {
+        "chain_id": "optimism",
+        "name": "Optimism",
+        "chain_type": "EVM",
+        "native_asset_symbol": "ETH",
+        "rpc_urls": [
+            "https://mainnet.optimism.io",
+            "https://rpc.ankr.com/optimism"
+        ],
+        "block_explorer_url": "https://optimistic.etherscan.io"
+    }
+]

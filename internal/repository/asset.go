@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -66,7 +67,8 @@ func (r *PostgresRepository) GetAsset(ctx context.Context, id string) (*assetsv1
 		WHERE id = $1
 	`
 
-	var assetId, symbol, name, assetTypeStr, category, description, logoUrl, websiteUrl string
+	var assetId, symbol, name, assetTypeStr string
+	var category, description, logoUrl, websiteUrl sql.NullString
 	var createdAt, updatedAt time.Time
 
 	err := r.queryRow(ctx, query, id).Scan(
@@ -94,10 +96,10 @@ func (r *PostgresRepository) GetAsset(ctx context.Context, id string) (*assetsv1
 		Symbol:      ptrIfNotEmpty(symbol),
 		Name:        ptrIfNotEmpty(name),
 		AssetType:   &assetType,
-		Category:    ptrIfNotEmpty(category),
-		Description: ptrIfNotEmpty(description),
-		LogoUrl:     ptrIfNotEmpty(logoUrl),
-		WebsiteUrl:  ptrIfNotEmpty(websiteUrl),
+		Category:    ptrFromNullString(category),
+		Description: ptrFromNullString(description),
+		LogoUrl:     ptrFromNullString(logoUrl),
+		WebsiteUrl:  ptrFromNullString(websiteUrl),
 		CreatedAt:   timestamppb.New(createdAt),
 		UpdatedAt:   timestamppb.New(updatedAt),
 	}
@@ -223,7 +225,8 @@ func (r *PostgresRepository) ListAssets(ctx context.Context, filter *AssetFilter
 
 	var assets []*assetsv1.Asset
 	for rows.Next() {
-		var assetId, symbol, name, assetTypeStr, category, description, logoUrl, websiteUrl string
+		var assetId, symbol, name, assetTypeStr string
+		var category, description, logoUrl, websiteUrl sql.NullString
 		var createdAt, updatedAt time.Time
 
 		err := rows.Scan(
@@ -248,10 +251,10 @@ func (r *PostgresRepository) ListAssets(ctx context.Context, filter *AssetFilter
 			Symbol:      ptrIfNotEmpty(symbol),
 			Name:        ptrIfNotEmpty(name),
 			AssetType:   &assetType,
-			Category:    ptrIfNotEmpty(category),
-			Description: ptrIfNotEmpty(description),
-			LogoUrl:     ptrIfNotEmpty(logoUrl),
-			WebsiteUrl:  ptrIfNotEmpty(websiteUrl),
+			Category:    ptrFromNullString(category),
+			Description: ptrFromNullString(description),
+			LogoUrl:     ptrFromNullString(logoUrl),
+			WebsiteUrl:  ptrFromNullString(websiteUrl),
 			CreatedAt:   timestamppb.New(createdAt),
 			UpdatedAt:   timestamppb.New(updatedAt),
 		}
@@ -329,7 +332,8 @@ func (r *PostgresRepository) SearchAssets(ctx context.Context, searchQuery strin
 
 	var assets []*assetsv1.Asset
 	for rows.Next() {
-		var assetId, symbol, name, assetTypeStr, category, description, logoUrl, websiteUrl string
+		var assetId, symbol, name, assetTypeStr string
+		var category, description, logoUrl, websiteUrl sql.NullString
 		var createdAt, updatedAt time.Time
 
 		err := rows.Scan(
@@ -354,10 +358,10 @@ func (r *PostgresRepository) SearchAssets(ctx context.Context, searchQuery strin
 			Symbol:      ptrIfNotEmpty(symbol),
 			Name:        ptrIfNotEmpty(name),
 			AssetType:   &assetType,
-			Category:    ptrIfNotEmpty(category),
-			Description: ptrIfNotEmpty(description),
-			LogoUrl:     ptrIfNotEmpty(logoUrl),
-			WebsiteUrl:  ptrIfNotEmpty(websiteUrl),
+			Category:    ptrFromNullString(category),
+			Description: ptrFromNullString(description),
+			LogoUrl:     ptrFromNullString(logoUrl),
+			WebsiteUrl:  ptrFromNullString(websiteUrl),
 			CreatedAt:   timestamppb.New(createdAt),
 			UpdatedAt:   timestamppb.New(updatedAt),
 		}
@@ -405,6 +409,14 @@ func ptrIfNotEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// ptrFromNullString converts sql.NullString to *string
+func ptrFromNullString(ns sql.NullString) *string {
+	if !ns.Valid || ns.String == "" {
+		return nil
+	}
+	return &ns.String
 }
 
 // CreateAssetIdentifier inserts a new asset identifier mapping

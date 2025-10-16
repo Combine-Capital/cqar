@@ -20,6 +20,8 @@ type AssetSeeder struct {
 	cqarClient      *client.CQARClient
 	dryRun          bool
 	limit           int
+	// Cache CoinGecko asset details for deployment seeding
+	assetDetailsCache map[string]*client.AssetDetails // key: coingecko_id
 }
 
 // NewAssetSeeder creates a new AssetSeeder instance
@@ -30,11 +32,17 @@ func NewAssetSeeder(
 	limit int,
 ) *AssetSeeder {
 	return &AssetSeeder{
-		coinGeckoClient: coinGeckoClient,
-		cqarClient:      cqarClient,
-		dryRun:          dryRun,
-		limit:           limit,
+		coinGeckoClient:   coinGeckoClient,
+		cqarClient:        cqarClient,
+		dryRun:            dryRun,
+		limit:             limit,
+		assetDetailsCache: make(map[string]*client.AssetDetails),
 	}
+}
+
+// GetAssetDetailsCache returns the cached asset details for use by deployment seeder
+func (s *AssetSeeder) GetAssetDetailsCache() map[string]*client.AssetDetails {
+	return s.assetDetailsCache
 }
 
 // SeedAssets seeds assets from CoinGecko Top 100
@@ -77,6 +85,9 @@ func (s *AssetSeeder) SeedAssets(ctx context.Context) (*bootstrap.SeedResult, er
 			result.AddFailure(assetSummary.Symbol, "failed to fetch details", err)
 			continue
 		}
+
+		// Cache the asset details for deployment seeding (avoids duplicate API calls)
+		s.assetDetailsCache[assetSummary.ID] = details
 
 		// Convert to AssetData
 		assetData, err := s.convertToAssetData(details)

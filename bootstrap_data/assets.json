@@ -1,0 +1,112 @@
+[
+    {
+        "id": "bitcoin",
+        "symbol": "BTC",
+        "name": "Bitcoin",
+        "type": "ASSET_TYPE_NATIVE",
+        "category": "layer-1",
+        "description": "Bitcoin is a decentralized digital currency that can be transferred on the peer-to-peer bitcoin network.",
+        "logo_url": "https://assets.coingecko.com/coins/images/1/large/bitcoin.png",
+        "website_url": "https://bitcoin.org",
+        "coingecko_id": "bitcoin"
+    },
+    {
+        "id": "ethereum",
+        "symbol": "ETH",
+        "name": "Ethereum",
+        "type": "ASSET_TYPE_NATIVE",
+        "category": "layer-1",
+        "description": "Ethereum is a decentralized platform that runs smart contracts.",
+        "logo_url": "https://assets.coingecko.com/coins/images/279/large/ethereum.png",
+        "website_url": "https://ethereum.org",
+        "coingecko_id": "ethereum"
+    },
+    {
+        "id": "tether",
+        "symbol": "USDT",
+        "name": "Tether",
+        "type": "ASSET_TYPE_ERC20",
+        "category": "fiat-backed-stablecoin",
+        "description": "Tether is a stablecoin pegged to the US Dollar.",
+        "logo_url": "https://assets.coingecko.com/coins/images/325/large/Tether.png",
+        "website_url": "https://tether.to",
+        "coingecko_id": "tether"
+    },
+    {
+        "id": "binancecoin",
+        "symbol": "BNB",
+        "name": "BNB",
+        "type": "ASSET_TYPE_NATIVE",
+        "category": "layer-1",
+        "description": "BNB is the native token of BNB Chain.",
+        "logo_url": "https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png",
+        "website_url": "https://www.bnbchain.org",
+        "coingecko_id": "binancecoin"
+    },
+    {
+        "id": "solana",
+        "symbol": "SOL",
+        "name": "Solana",
+        "type": "ASSET_TYPE_NATIVE",
+        "category": "layer-1",
+        "description": "Solana is a high-performance blockchain supporting builders around the world.",
+        "logo_url": "https://assets.coingecko.com/coins/images/4128/large/solana.png",
+        "website_url": "https://solana.com",
+        "coingecko_id": "solana"
+    },
+    {
+        "id": "usd-coin",
+        "symbol": "USDC",
+        "name": "USDC",
+        "type": "ASSET_TYPE_ERC20",
+        "category": "fiat-backed-stablecoin",
+        "description": "USDC is a fully-reserved stablecoin, which is a type of cryptocurrency that is pegged to the U.S. dollar.",
+        "logo_url": "https://assets.coingecko.com/coins/images/6319/large/usdc.png",
+        "website_url": "https://www.circle.com/usdc",
+        "coingecko_id": "usd-coin"
+    },
+    {
+        "id": "ripple",
+        "symbol": "XRP",
+        "name": "XRP",
+        "type": "ASSET_TYPE_NATIVE",
+        "category": "layer-1",
+        "description": "XRP is a digital asset built for payments.",
+        "logo_url": "https://assets.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png",
+        "website_url": "https://xrpl.org",
+        "coingecko_id": "ripple"
+    },
+    {
+        "id": "cardano",
+        "symbol": "ADA",
+        "name": "Cardano",
+        "type": "ASSET_TYPE_NATIVE",
+        "category": "layer-1",
+        "description": "Cardano is a proof-of-stake blockchain platform.",
+        "logo_url": "https://assets.coingecko.com/coins/images/975/large/cardano.png",
+        "website_url": "https://cardano.org",
+        "coingecko_id": "cardano"
+    },
+    {
+        "id": "dogecoin",
+        "symbol": "DOGE",
+        "name": "Dogecoin",
+        "type": "ASSET_TYPE_NATIVE",
+        "category": "meme",
+        "description": "Dogecoin is a cryptocurrency featuring the Shiba Inu dog from the Doge meme.",
+        "logo_url": "https://assets.coingecko.com/coins/images/5/large/dogecoin.png",
+        "website_url": "https://dogecoin.com",
+        "coingecko_id": "dogecoin"
+    },
+    {
+        "id": "tron",
+        "symbol": "TRX",
+        "name": "TRON",
+        "type": "ASSET_TYPE_NATIVE",
+        "category": "layer-1",
+        "description": "TRON is a blockchain-based decentralized platform.",
+        "logo_url": "https://assets.coingecko.com/coins/images/1094/large/tron-logo.png",
+        "website_url": "https://tron.network",
+        "coingecko_id": "tron"
+    }
+]

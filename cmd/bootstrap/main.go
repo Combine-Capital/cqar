@@ -109,7 +109,23 @@ func runSeeding(ctx context.Context, clients *Clients, cfg *bootstrap.Config) er
 
 	logSeedResult("Assets", assetResult)
 
-	// Step 3: Summary
+	// Step 3: Seed deployments using cached asset data
+	log.Info().Msg("=== Step 3: Seeding Deployments ===")
+	deploymentSeeder := seeder.NewDeploymentSeeder(
+		clients.CoinGecko,
+		clients.CQAR,
+		*dryRun,
+		*limit,
+		assetSeeder.GetAssetDetailsCache(), // Pass cached data to avoid duplicate API calls
+	)
+	deploymentResult, err := deploymentSeeder.SeedDeployments(ctx)
+	if err != nil {
+		return fmt.Errorf("seed deployments: %w", err)
+	}
+
+	logSeedResult("Deployments", deploymentResult)
+
+	// Step 4: Summary
 	log.Info().Msg("=== Bootstrap Summary ===")
 	log.Info().
 		Int("chains_processed", chainResult.TotalProcessed).
@@ -120,6 +136,10 @@ func runSeeding(ctx context.Context, clients *Clients, cfg *bootstrap.Config) er
 		Int("assets_succeeded", assetResult.Succeeded).
 		Int("assets_failed", assetResult.Failed).
 		Int("assets_skipped", assetResult.Skipped).
+		Int("deployments_processed", deploymentResult.TotalProcessed).
+		Int("deployments_succeeded", deploymentResult.Succeeded).
+		Int("deployments_failed", deploymentResult.Failed).
+		Int("deployments_skipped", deploymentResult.Skipped).
 		Msg("Bootstrap complete")
 
 	return nil
@@ -208,6 +228,14 @@ func createClients(ctx context.Context, cfg *bootstrap.Config) (*Clients, error)
 	if err != nil {
 		return nil, fmt.Errorf("create CQAR client: %w", err)
 	}
+
+	// Verify CQAR service is running by listing chains
+	log.Info().Msg("Verifying CQAR service connectivity...")
+	_, err = cqarClient.ListChains(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("CQAR service check failed - ensure CQAR is running on %s: %w", cfg.CQAR.GRPCEndpoint, err)
+	}
+	log.Info().Msg("CQAR service is reachable and responding")
 
 	return &Clients{
 		Coinbase:  coinbaseClient,
