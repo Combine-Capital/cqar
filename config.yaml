@@ -30,7 +30,7 @@ database:
 cache:
   host: "localhost"
   port: 6379
-  password: ""
+  password: "cqar_dev_password"
   db: 0
   default_ttl: "60m"
   max_retries: 3

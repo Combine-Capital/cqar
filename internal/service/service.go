@@ -12,6 +12,7 @@ import (
 	servicesv1 "github.com/Combine-Capital/cqc/gen/go/cqc/services/v1"
 	"github.com/Combine-Capital/cqi/pkg/auth"
 	"github.com/Combine-Capital/cqi/pkg/bus"
+	"github.com/Combine-Capital/cqi/pkg/cache"
 	"github.com/Combine-Capital/cqi/pkg/database"
 	"github.com/Combine-Capital/cqi/pkg/logging"
 	"github.com/Combine-Capital/cqi/pkg/metrics"
@@ -23,12 +24,13 @@ import (
 )
 
 // Service implements the CQI service interface for CQAR.
-// It manages the lifecycle of all service components: database, repository, managers,
+// It manages the lifecycle of all service components: database, cache, repository, managers,
 // gRPC server, and HTTP health server.
 type Service struct {
 	cfg         *config.Config
 	logger      *logging.Logger
 	dbPool      *database.Pool
+	cache       cache.Cache
 	eventBus    bus.EventBus
 	grpcService *cqiservice.GRPCService
 	httpService *cqiservice.HTTPService
@@ -45,12 +47,13 @@ func New(cfg *config.Config, logger *logging.Logger) *Service {
 // Start initializes all service components and starts the gRPC and HTTP servers.
 // Initialization order:
 // 1. Database pool
-// 2. Event bus
-// 3. Repository layer
-// 4. Event publisher
-// 5. Business logic managers
-// 6. gRPC server with AssetRegistry implementation
-// 7. HTTP health server
+// 2. Cache (Redis)
+// 3. Event bus
+// 4. Repository layer (with cache)
+// 5. Event publisher
+// 6. Business logic managers
+// 7. gRPC server with AssetRegistry implementation
+// 8. HTTP health server
 func (s *Service) Start(ctx context.Context) error {
 	s.logger.Info().Msg("Initializing CQAR service components")
 
@@ -59,13 +62,30 @@ func (s *Service) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
+	// Initialize cache
+	if err := s.initCache(ctx); err != nil {
+		return fmt.Errorf("failed to initialize cache: %w", err)
+	}
+
 	// Initialize event bus
 	if err := s.initEventBus(ctx); err != nil {
 		return fmt.Errorf("failed to initialize event bus: %w", err)
 	}
 
-	// Initialize repository
-	repo := repository.NewPostgresRepository(s.dbPool)
+	// Initialize base repository
+	baseRepo := repository.NewPostgresRepository(s.dbPool)
+
+	// Wrap repository with cache layer
+	cacheTTLs := repository.CacheTTLs{
+		Asset:       s.cfg.CacheTTL.Asset,
+		Symbol:      s.cfg.CacheTTL.Symbol,
+		Venue:       s.cfg.CacheTTL.Venue,
+		VenueAsset:  s.cfg.CacheTTL.VenueAsset,
+		VenueSymbol: s.cfg.CacheTTL.VenueSymbol,
+		QualityFlag: s.cfg.CacheTTL.QualityFlag,
+		Chain:       s.cfg.CacheTTL.Asset, // Use same TTL as assets for chains
+	}
+	repo := repository.NewCachedRepository(baseRepo, s.cache, cacheTTLs)
 
 	// Initialize event publisher
 	eventPublisher := manager.NewEventPublisher(s.eventBus, s.logger)
@@ -162,7 +182,8 @@ func (s *Service) Start(ctx context.Context) error {
 // 1. HTTP server (stop accepting health checks)
 // 2. gRPC server (drain in-flight requests)
 // 3. Event bus (flush pending events)
-// 4. Database pool (close connections)
+// 4. Cache (close connections)
+// 5. Database pool (close connections)
 func (s *Service) Stop(ctx context.Context) error {
 	s.logger.Info().Msg("Shutting down CQAR service")
 
@@ -186,6 +207,15 @@ func (s *Service) Stop(ctx context.Context) error {
 			s.logger.Error().Err(err).Msg("Failed to close event bus")
 		} else {
 			s.logger.Info().Msg("Event bus closed")
+		}
+	}
+
+	// Close cache
+	if s.cache != nil {
+		if err := s.cache.Close(); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to close cache")
+		} else {
+			s.logger.Info().Msg("Cache closed")
 		}
 	}
 
@@ -239,6 +269,29 @@ func (s *Service) initDatabase(ctx context.Context) error {
 	return nil
 }
 
+// initCache initializes the Redis cache.
+func (s *Service) initCache(ctx context.Context) error {
+	s.logger.Info().
+		Str("host", s.cfg.Cache.Host).
+		Int("port", s.cfg.Cache.Port).
+		Msg("Connecting to cache")
+
+	c, err := cache.NewRedis(ctx, s.cfg.Cache)
+	if err != nil {
+		return fmt.Errorf("failed to create cache: %w", err)
+	}
+
+	// Verify connectivity
+	if err := c.CheckHealth(ctx); err != nil {
+		c.Close()
+		return fmt.Errorf("cache health check failed: %w", err)
+	}
+
+	s.cache = c
+	s.logger.Info().Msg("Cache connection established")
+	return nil
+}
+
 // initEventBus initializes the NATS JetStream event bus.
 func (s *Service) initEventBus(ctx context.Context) error {
 	s.logger.Info().
@@ -267,21 +320,36 @@ func (s *Service) createHealthHandler(repo repository.Repository) http.Handler {
 	})
 
 	// Readiness endpoint - returns 200 if service is ready to accept traffic
-	// Checks database connectivity
+	// Checks database and cache connectivity
 	mux.HandleFunc("/health/ready", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), s.cfg.Database.ConnectTimeout)
 		defer cancel()
 
 		// Check database health
+		dbHealthy := true
 		if err := repo.Ping(ctx); err != nil {
 			s.logger.Error().Err(err).Msg("Readiness check failed: database unhealthy")
+			dbHealthy = false
+		}
+
+		// Check cache health
+		cacheHealthy := true
+		if s.cache != nil {
+			if err := s.cache.CheckHealth(ctx); err != nil {
+				s.logger.Error().Err(err).Msg("Readiness check failed: cache unhealthy")
+				cacheHealthy = false
+			}
+		}
+
+		if !dbHealthy || !cacheHealthy {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(fmt.Sprintf(`{"status":"unhealthy","component":"database","error":"%s"}`, err.Error())))
+			w.Write([]byte(fmt.Sprintf(`{"status":"unhealthy","components":{"database":"%s","cache":"%s"}}`,
+				healthStatus(dbHealthy), healthStatus(cacheHealthy))))
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ready","components":{"database":"ok"}}`))
+		w.Write([]byte(`{"status":"ready","components":{"database":"ok","cache":"ok"}}`))
 	})
 
 	// Health endpoint - comprehensive health check (alias for /health/ready)
@@ -289,18 +357,42 @@ func (s *Service) createHealthHandler(repo repository.Repository) http.Handler {
 		ctx, cancel := context.WithTimeout(r.Context(), s.cfg.Database.ConnectTimeout)
 		defer cancel()
 
+		// Check database health
+		dbHealthy := true
 		if err := repo.Ping(ctx); err != nil {
 			s.logger.Error().Err(err).Msg("Health check failed: database unhealthy")
+			dbHealthy = false
+		}
+
+		// Check cache health
+		cacheHealthy := true
+		if s.cache != nil {
+			if err := s.cache.CheckHealth(ctx); err != nil {
+				s.logger.Error().Err(err).Msg("Health check failed: cache unhealthy")
+				cacheHealthy = false
+			}
+		}
+
+		if !dbHealthy || !cacheHealthy {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(fmt.Sprintf(`{"status":"unhealthy","component":"database","error":"%s"}`, err.Error())))
+			w.Write([]byte(fmt.Sprintf(`{"status":"unhealthy","components":{"database":"%s","cache":"%s"}}`,
+				healthStatus(dbHealthy), healthStatus(cacheHealthy))))
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy","components":{"database":"ok"}}`))
+		w.Write([]byte(`{"status":"healthy","components":{"database":"ok","cache":"ok"}}`))
 	})
 
 	return mux
+}
+
+// healthStatus returns a health status string
+func healthStatus(healthy bool) string {
+	if healthy {
+		return "ok"
+	}
+	return "unhealthy"
 }
 
 // HealthServer implements gRPC health checking protocol.
