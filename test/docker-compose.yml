@@ -1,0 +1,61 @@
+version: "3.9"
+
+# Docker Compose configuration for CQAR integration tests
+# Provides PostgreSQL, Redis, and NATS infrastructure
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: cqar-test-postgres
+    environment:
+      POSTGRES_USER: cqar_test
+      POSTGRES_PASSWORD: cqar_test_password
+      POSTGRES_DB: cqar_test
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cqar_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    networks:
+      - cqar-test
+
+  redis:
+    image: redis:7-alpine
+    container_name: cqar-test-redis
+    command: redis-server --requirepass cqar_test_password
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cqar-test
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: cqar-test-nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4223:4222"  # Client connections
+      - "8223:8222"  # HTTP monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cqar-test
+
+volumes:
+  postgres_test_data:
+    driver: local
+
+networks:
+  cqar-test:
+    driver: bridge

@@ -1,0 +1,78 @@
+# CQAR Integration Test Configuration
+
+service:
+  name: "cqar-test"
+  version: "0.1.0"
+  env: "test"
+
+server:
+  http_port: 8081
+  grpc_port: 9091
+  read_timeout: "30s"
+  write_timeout: "30s"
+  shutdown_timeout: "10s"
+
+database:
+  host: "localhost"
+  port: 5433
+  user: "cqar_test"
+  password: "cqar_test_password"
+  database: "cqar_test"
+  ssl_mode: "disable"
+  max_conns: 10
+  min_conns: 2
+  max_conn_lifetime: "15m"
+  max_conn_idle_time: "5m"
+  connect_timeout: "5s"
+  query_timeout: "30s"
+
+cache:
+  host: "localhost"
+  port: 6380
+  password: "cqar_test_password"
+  db: 0
+  default_ttl: "5m"
+  max_retries: 3
+  min_idle_conns: 2
+  pool_size: 5
+
+eventbus:
+  backend: "jetstream"
+  servers:
+    - "nats://localhost:4223"
+  stream_name: "cqc_events_test"
+  consumer_name: "cqar_test"
+  max_deliver: 3
+  ack_wait: "30s"
+  max_ack_pending: 100
+
+log:
+  level: "debug"
+  format: "json"
+  output: "stdout"
+
+metrics:
+  enabled: false
+  port: 9092
+  path: "/metrics"
+  namespace: "cqar_test"
+
+tracing:
+  enabled: false
+  endpoint: ""
+  sample_rate: 1.0
+  service_name: "cqar-test"
+
+auth:
+  api_keys:
+    - "test_key_1"
+    - "test_key_2"
+
+# CQAR-specific settings
+cache_ttl:
+  asset: "5m"
+  symbol: "5m"
+  venue: "5m"
+  venue_asset: "2m"
+  venue_symbol: "2m"
+  quality_flag: "1m"

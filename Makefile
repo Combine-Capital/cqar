@@ -55,12 +55,53 @@ test-coverage: test ## Run tests and generate coverage report
 	@echo "✓ Coverage report generated: coverage.html"
 
 .PHONY: test-integration
-test-integration: ## Run integration tests
+test-integration: ## Run integration tests (requires test infrastructure)
 	@echo "Running integration tests..."
-	@echo "Note: Requires PostgreSQL with migrations applied"
-	@echo "Use 'make test-db-setup' first if not already done"
-	@TEST_DB_URL="$(DB_URL)" go test -v ./test/integration/...
+	@echo "Note: Requires test infrastructure running (make test-infra-up)"
+	@TEST_DB_HOST=localhost TEST_DB_PORT=5433 TEST_DB_USER=cqar_test TEST_DB_PASSWORD=cqar_test_password TEST_DB_NAME=cqar_test \
+	TEST_REDIS_HOST=localhost TEST_REDIS_PORT=6380 TEST_REDIS_PASSWORD=cqar_test_password \
+	TEST_NATS_URL=nats://localhost:4223 \
+	go test -v ./test/integration/...
 	@echo "✓ Integration tests completed"
+
+.PHONY: test-integration-short
+test-integration-short: ## Run integration tests (skip performance tests)
+	@echo "Running integration tests (short mode)..."
+	@TEST_DB_HOST=localhost TEST_DB_PORT=5433 TEST_DB_USER=cqar_test TEST_DB_PASSWORD=cqar_test_password TEST_DB_NAME=cqar_test \
+	TEST_REDIS_HOST=localhost TEST_REDIS_PORT=6380 TEST_REDIS_PASSWORD=cqar_test_password \
+	TEST_NATS_URL=nats://localhost:4223 \
+	go test -v -short ./test/integration/...
+	@echo "✓ Integration tests completed"
+
+.PHONY: test-infra-up
+test-infra-up: ## Start test infrastructure (PostgreSQL, Redis, NATS)
+	@echo "Starting test infrastructure..."
+	@cd test && docker-compose up -d
+	@echo "Waiting for services to be healthy..."
+	@sleep 5
+	@cd test && docker-compose ps
+	@echo "✓ Test infrastructure started"
+
+.PHONY: test-infra-down
+test-infra-down: ## Stop test infrastructure
+	@echo "Stopping test infrastructure..."
+	@cd test && docker-compose down -v
+	@echo "✓ Test infrastructure stopped"
+
+.PHONY: test-infra-logs
+test-infra-logs: ## Show test infrastructure logs
+	@cd test && docker-compose logs -f
+
+.PHONY: test-migrate
+test-migrate: ## Run migrations on test database
+	@echo "Running migrations on test database..."
+	@which migrate > /dev/null || (echo "golang-migrate not installed. Install from https://github.com/golang-migrate/migrate" && exit 1)
+	@migrate -path $(MIGRATE_DIR) -database "postgres://cqar_test:cqar_test_password@localhost:5433/cqar_test?sslmode=disable" up
+	@echo "✓ Test database migrations completed"
+
+.PHONY: test-all
+test-all: test-infra-up test-migrate test-integration test-infra-down ## Complete integration test cycle
+	@echo "✓ All integration tests passed"
 
 .PHONY: test-db-setup
 test-db-setup: ## Setup test database with migrations
