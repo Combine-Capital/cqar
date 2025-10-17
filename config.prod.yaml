@@ -1,40 +1,68 @@
 # CQAR Production Configuration
-# Overrides base config for production deployment
+# Complete configuration for production deployment with environment variables
 
 service:
+  name: "cqar"
+  version: "${CQAR_VERSION:-0.1.0}"
   env: "production"
 
 server:
+  http_port: 8080
+  grpc_port: 9090
+  read_timeout: "30s"
+  write_timeout: "30s"
   shutdown_timeout: "60s"
 
 database:
   host: "${CQAR_DATABASE_HOST}"
+  port: 5432
   user: "${CQAR_DATABASE_USER}"
   password: "${CQAR_DATABASE_PASSWORD}"
+  database: "${CQAR_DATABASE_NAME:-cqar}"
   ssl_mode: "require"
   max_conns: 100
-  min_idle_conns: 25
+  min_conns: 25
   max_conn_lifetime: "30m"
+  max_conn_idle_time: "10m"
+  connect_timeout: "10s"
+  query_timeout: "30s"
 
 cache:
   host: "${CQAR_CACHE_HOST}"
+  port: 6379
   password: "${CQAR_CACHE_PASSWORD}"
+  db: 0
+  default_ttl: "60m"
   max_retries: 5
+  min_idle_conns: 10
   pool_size: 50
 
 eventbus:
+  backend: "jetstream"
   servers:
-    - "${CQAR_EVENT_BUS_URL}"
+    - "${CQAR_NATS_URL}"
+  stream_name: "cqc_events"
   consumer_name: "cqar-${HOSTNAME}"
+  max_deliver: 3
+  ack_wait: "30s"
+  max_ack_pending: 1000
 
 log:
-  level: "info"
+  level: "${CQAR_LOG_LEVEL:-info}"
   format: "json"
+  output: "stdout"
+
+metrics:
+  enabled: true
+  port: 9091
+  path: "/metrics"
+  namespace: "cqar"
 
 tracing:
   enabled: true
   endpoint: "${CQAR_TRACING_ENDPOINT}"
   sample_rate: 0.1  # Sample 10% of traces in production
+  service_name: "cqar"
 
 auth:
   api_keys:
@@ -42,3 +70,37 @@ auth:
     - "${CQAR_API_KEY_CQPM}"
     - "${CQAR_API_KEY_CQVX}"
     - "${CQAR_API_KEY_ADMIN}"
+
+# CQAR-specific cache TTL settings
+cache_ttl:
+  asset: "60m"
+  symbol: "60m"
+  venue: "60m"
+  venue_asset: "15m"
+  venue_symbol: "15m"
+  quality_flag: "5m"
+
+# Bootstrap data seeding configuration (for production data initialization)
+bootstrap:
+  coinbase:
+    base_url: "https://api.coinbase.com"
+    api_key: "${COINBASE_API_KEY:-}"
+  
+  coingecko:
+    base_url: "https://api.coingecko.com/api/v3"
+    api_key: "${COINGECKO_API_KEY:-}"
+    rate_limit_per_second: 30
+  
+  cqar:
+    grpc_endpoint: "${CQAR_GRPC_ENDPOINT:-localhost:9090}"
+  
+  chains:
+    - ethereum
+    - polygon-pos
+    - binance-smart-chain
+    - solana
+    - bitcoin
+    - arbitrum-one
+    - optimistic-ethereum
+    - avalanche
+    - base

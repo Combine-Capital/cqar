@@ -30,6 +30,17 @@ build: ## Build the CQAR binary
 	@go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME) $(BUILD_DIR)
 	@echo "✓ Binary built: $(OUTPUT_DIR)/$(BINARY_NAME)"
 
+.PHONY: build-bootstrap
+build-bootstrap: ## Build the bootstrap binary
+	@echo "Building bootstrap..."
+	@mkdir -p $(OUTPUT_DIR)
+	@go build $(LDFLAGS) -o $(OUTPUT_DIR)/bootstrap ./cmd/bootstrap
+	@echo "✓ Binary built: $(OUTPUT_DIR)/bootstrap"
+
+.PHONY: build-all
+build-all: build build-bootstrap ## Build all binaries
+	@echo "✓ All binaries built"
+
 .PHONY: build-linux
 build-linux: ## Build the CQAR binary for Linux
 	@echo "Building $(BINARY_NAME) for Linux..."
@@ -40,7 +51,17 @@ build-linux: ## Build the CQAR binary for Linux
 .PHONY: run
 run: ## Run the CQAR service locally
 	@echo "Running $(BINARY_NAME)..."
-	@go run $(BUILD_DIR)/main.go
+	@go run $(BUILD_DIR)/main.go --config config.dev.yaml
+
+.PHONY: bootstrap
+bootstrap: build-bootstrap ## Run bootstrap to seed data from files
+	@echo "Running bootstrap..."
+	@./bin/bootstrap --config config.dev.yaml --data-dir bootstrap_data
+
+.PHONY: bootstrap-verbose
+bootstrap-verbose: build-bootstrap ## Run bootstrap with verbose logging
+	@echo "Running bootstrap (verbose)..."
+	@./bin/bootstrap --config config.dev.yaml --data-dir bootstrap_data --verbose
 
 .PHONY: test
 test: ## Run unit tests

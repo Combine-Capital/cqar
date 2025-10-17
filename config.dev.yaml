@@ -1,12 +1,17 @@
 # CQAR Development Configuration
-# Overrides base config for local development
+# Complete configuration for local development with Docker infrastructure
 
 service:
+  name: "cqar"
+  version: "0.1.0"
   env: "development"
 
 server:
-  grpc_port: 9090
   http_port: 8080
+  grpc_port: 9090
+  read_timeout: "30s"
+  write_timeout: "30s"
+  shutdown_timeout: "30s"
 
 database:
   host: "localhost"
@@ -15,26 +20,49 @@ database:
   password: "cqar_dev_password"
   database: "cqar"
   ssl_mode: "disable"
+  max_conns: 25
+  min_conns: 5
+  max_conn_lifetime: "15m"
+  max_conn_idle_time: "5m"
+  connect_timeout: "5s"
+  query_timeout: "30s"
 
 cache:
   host: "localhost"
   port: 6379
   password: "cqar_dev_password"
+  db: 0
+  default_ttl: "60m"
+  max_retries: 3
+  min_idle_conns: 5
+  pool_size: 10
 
 eventbus:
   backend: "jetstream"
   servers:
     - "nats://localhost:4222"
   stream_name: "cqc_events"
+  consumer_name: "cqar"
+  max_deliver: 3
+  ack_wait: "30s"
+  max_ack_pending: 1000
 
 log:
   level: "debug"
   format: "console"
+  output: "stdout"
+
+metrics:
+  enabled: true
+  port: 9091
+  path: "/metrics"
+  namespace: "cqar"
 
 tracing:
   enabled: true
   endpoint: "localhost:4317"
   sample_rate: 1.0  # Sample all traces in development
+  service_name: "cqar"
 
 auth:
   api_keys:
@@ -42,3 +70,41 @@ auth:
     - "dev_key_cqpm_67890"
     - "dev_key_cqvx_abcde"
     - "dev_key_test_99999"  # Extra key for testing
+
+# CQAR-specific cache TTL settings
+cache_ttl:
+  asset: "60m"
+  symbol: "60m"
+  venue: "60m"
+  venue_asset: "15m"
+  venue_symbol: "15m"
+  quality_flag: "5m"
+
+# Bootstrap data seeding configuration
+bootstrap:
+  # Coinbase API configuration (optional)
+  coinbase:
+    base_url: "https://api.coinbase.com"
+    api_key: "" # Optional: set via COINBASE_API_KEY environment variable
+  
+  # CoinGecko API configuration
+  coingecko:
+    base_url: "https://api.coingecko.com/api/v3"
+    api_key: "" # Optional: Free tier works without key. Set via COINGECKO_API_KEY for higher limits
+    rate_limit_per_second: 10 # Free tier: 10-50 requests/minute
+  
+  # CQAR gRPC endpoint for bootstrap tool
+  cqar:
+    grpc_endpoint: "localhost:9090"
+  
+  # Chains to process during bootstrap
+  chains:
+    - ethereum
+    - polygon-pos
+    - binance-smart-chain
+    - solana
+    - bitcoin
+    - arbitrum-one
+    - optimistic-ethereum
+    - avalanche
+    - base
