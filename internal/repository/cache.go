@@ -2,12 +2,10 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	assetsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/assets/v1"
-	marketsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/markets/v1"
 	venuesv1 "github.com/Combine-Capital/cqc/gen/go/cqc/venues/v1"
 	"github.com/Combine-Capital/cqi/pkg/cache"
 	"github.com/Combine-Capital/cqi/pkg/metrics"
@@ -112,12 +110,12 @@ func recordCacheSkip(entityType string) {
 // CacheTTLs holds cache TTL configuration for different entity types
 type CacheTTLs struct {
 	Asset       time.Duration // Default: 60m
-	Symbol      time.Duration // Default: 60m
 	Venue       time.Duration // Default: 60m
 	VenueAsset  time.Duration // Default: 15m
-	VenueSymbol time.Duration // Default: 15m
 	QualityFlag time.Duration // Default: 5m
 	Chain       time.Duration // Default: 60m
+	Instrument  time.Duration // Default: 60m
+	Market      time.Duration // Default: 15m
 }
 
 // cacheGetOrLoad is a helper that implements the cache-aside pattern with metrics.
@@ -255,71 +253,6 @@ func (r *CachedRepository) DeleteAsset(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetSymbol retrieves a symbol with cache-aside pattern
-func (r *CachedRepository) GetSymbol(ctx context.Context, id string) (*marketsv1.Symbol, error) {
-	if r.cache == nil {
-		return r.Repository.GetSymbol(ctx, id)
-	}
-
-	key := cache.Key("symbol", id)
-	symbol := &marketsv1.Symbol{}
-
-	err := cacheGetOrLoad(ctx, r.cache, key, symbol, r.cacheTTLs.Symbol, "symbol", func(ctx context.Context) (proto.Message, error) {
-		return r.Repository.GetSymbol(ctx, id)
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return symbol, nil
-}
-
-// CreateSymbol creates a symbol and invalidates cache if it exists
-func (r *CachedRepository) CreateSymbol(ctx context.Context, symbol *marketsv1.Symbol) error {
-	err := r.Repository.CreateSymbol(ctx, symbol)
-	if err != nil {
-		return err
-	}
-
-	// Invalidate cache after successful creation
-	if r.cache != nil && symbol.SymbolId != nil {
-		invalidateCache(ctx, r.cache, cache.Key("symbol", *symbol.SymbolId))
-	}
-
-	return nil
-}
-
-// UpdateSymbol updates a symbol and invalidates cache
-func (r *CachedRepository) UpdateSymbol(ctx context.Context, symbol *marketsv1.Symbol) error {
-	err := r.Repository.UpdateSymbol(ctx, symbol)
-	if err != nil {
-		return err
-	}
-
-	// Invalidate cache after successful update
-	if r.cache != nil && symbol.SymbolId != nil {
-		invalidateCache(ctx, r.cache, cache.Key("symbol", *symbol.SymbolId))
-	}
-
-	return nil
-}
-
-// DeleteSymbol deletes a symbol and invalidates cache
-func (r *CachedRepository) DeleteSymbol(ctx context.Context, id string) error {
-	err := r.Repository.DeleteSymbol(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	// Invalidate cache after successful deletion
-	if r.cache != nil {
-		invalidateCache(ctx, r.cache, cache.Key("symbol", id))
-	}
-
-	return nil
-}
-
 // GetVenue retrieves a venue with cache-aside pattern
 func (r *CachedRepository) GetVenue(ctx context.Context, id string) (*venuesv1.Venue, error) {
 	if r.cache == nil {
@@ -423,88 +356,6 @@ func (r *CachedRepository) CreateVenueAsset(ctx context.Context, venueAsset *ven
 	}
 
 	return nil
-}
-
-// GetVenueSymbol retrieves a venue symbol with cache-aside pattern
-func (r *CachedRepository) GetVenueSymbol(ctx context.Context, venueID, venueSymbol string) (*venuesv1.VenueSymbol, error) {
-	if r.cache == nil {
-		return r.Repository.GetVenueSymbol(ctx, venueID, venueSymbol)
-	}
-
-	key := cache.Key("venue_symbol", venueID, venueSymbol)
-	venueSymbolMsg := &venuesv1.VenueSymbol{}
-
-	err := cacheGetOrLoad(ctx, r.cache, key, venueSymbolMsg, r.cacheTTLs.VenueSymbol, "venue_symbol", func(ctx context.Context) (proto.Message, error) {
-		return r.Repository.GetVenueSymbol(ctx, venueID, venueSymbol)
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return venueSymbolMsg, nil
-}
-
-// GetVenueSymbolByID retrieves a venue symbol by ID with cache-aside pattern
-func (r *CachedRepository) GetVenueSymbolByID(ctx context.Context, venueID, symbolID string) (*venuesv1.VenueSymbol, error) {
-	if r.cache == nil {
-		return r.Repository.GetVenueSymbolByID(ctx, venueID, symbolID)
-	}
-
-	key := cache.Key("venue_symbol_by_id", venueID, symbolID)
-	venueSymbol := &venuesv1.VenueSymbol{}
-
-	err := cacheGetOrLoad(ctx, r.cache, key, venueSymbol, r.cacheTTLs.VenueSymbol, "venue_symbol", func(ctx context.Context) (proto.Message, error) {
-		return r.Repository.GetVenueSymbolByID(ctx, venueID, symbolID)
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return venueSymbol, nil
-}
-
-// CreateVenueSymbol creates a venue symbol and invalidates cache
-func (r *CachedRepository) CreateVenueSymbol(ctx context.Context, venueSymbol *venuesv1.VenueSymbol) error {
-	err := r.Repository.CreateVenueSymbol(ctx, venueSymbol)
-	if err != nil {
-		return err
-	}
-
-	// Invalidate both cache keys after successful creation
-	if r.cache != nil && venueSymbol.VenueId != nil {
-		if venueSymbol.VenueSymbol != nil {
-			invalidateCache(ctx, r.cache, cache.Key("venue_symbol", *venueSymbol.VenueId, *venueSymbol.VenueSymbol))
-		}
-		if venueSymbol.SymbolId != nil {
-			invalidateCache(ctx, r.cache, cache.Key("venue_symbol_by_id", *venueSymbol.VenueId, *venueSymbol.SymbolId))
-		}
-	}
-
-	return nil
-}
-
-// GetVenueSymbolEnriched retrieves enriched venue symbol with cache-aside pattern
-// Note: This method caches the venue symbol but always fetches the canonical symbol from cache/DB
-func (r *CachedRepository) GetVenueSymbolEnriched(ctx context.Context, venueID, venueSymbol string) (*venuesv1.VenueSymbol, *marketsv1.Symbol, error) {
-	// Get venue symbol with caching
-	vs, err := r.GetVenueSymbol(ctx, venueID, venueSymbol)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Get canonical symbol with caching
-	if vs.SymbolId == nil {
-		return nil, nil, fmt.Errorf("venue symbol missing symbol_id")
-	}
-
-	symbol, err := r.GetSymbol(ctx, *vs.SymbolId)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get canonical symbol: %w", err)
-	}
-
-	return vs, symbol, nil
 }
 
 // ListQualityFlags retrieves quality flags with cache-aside pattern

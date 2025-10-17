@@ -4,6 +4,7 @@ import (
 	"context"
 
 	assetsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/assets/v1"
+	identifiersv1 "github.com/Combine-Capital/cqc/gen/go/cqc/identifiers/v1"
 	marketsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/markets/v1"
 	venuesv1 "github.com/Combine-Capital/cqc/gen/go/cqc/venues/v1"
 )
@@ -45,18 +46,37 @@ type Repository interface {
 	RemoveAssetFromGroup(ctx context.Context, groupID, assetID string) error
 	ListAssetGroups(ctx context.Context, filter *AssetGroupFilter) ([]*assetsv1.AssetGroup, error)
 
-	// Symbol operations
-	CreateSymbol(ctx context.Context, symbol *marketsv1.Symbol) error
-	GetSymbol(ctx context.Context, id string) (*marketsv1.Symbol, error)
-	UpdateSymbol(ctx context.Context, symbol *marketsv1.Symbol) error
-	DeleteSymbol(ctx context.Context, id string) error
-	ListSymbols(ctx context.Context, filter *SymbolFilter) ([]*marketsv1.Symbol, error)
-	SearchSymbols(ctx context.Context, query string, filter *SymbolFilter) ([]*marketsv1.Symbol, error)
+	// Instrument operations
+	CreateInstrument(ctx context.Context, instrument *marketsv1.Instrument) error
+	GetInstrument(ctx context.Context, id string) (*marketsv1.Instrument, error)
 
-	// SymbolIdentifier operations
-	CreateSymbolIdentifier(ctx context.Context, identifier *marketsv1.SymbolIdentifier) error
-	GetSymbolIdentifier(ctx context.Context, id string) (*marketsv1.SymbolIdentifier, error)
-	ListSymbolIdentifiers(ctx context.Context, filter *SymbolIdentifierFilter) ([]*marketsv1.SymbolIdentifier, error)
+	// Instrument subtype operations
+	CreateSpotInstrument(ctx context.Context, spot *marketsv1.SpotInstrument) error
+	GetSpotInstrument(ctx context.Context, instrumentID string) (*marketsv1.SpotInstrument, error)
+	CreatePerpContract(ctx context.Context, perp *marketsv1.PerpContract) error
+	GetPerpContract(ctx context.Context, instrumentID string) (*marketsv1.PerpContract, error)
+	CreateFutureContract(ctx context.Context, future *marketsv1.FutureContract) error
+	GetFutureContract(ctx context.Context, instrumentID string) (*marketsv1.FutureContract, error)
+	CreateOptionSeries(ctx context.Context, option *marketsv1.OptionSeries) error
+	GetOptionSeries(ctx context.Context, instrumentID string) (*marketsv1.OptionSeries, error)
+	CreateLendingDeposit(ctx context.Context, deposit *marketsv1.LendingDeposit) error
+	GetLendingDeposit(ctx context.Context, instrumentID string) (*marketsv1.LendingDeposit, error)
+	CreateLendingBorrow(ctx context.Context, borrow *marketsv1.LendingBorrow) error
+	GetLendingBorrow(ctx context.Context, instrumentID string) (*marketsv1.LendingBorrow, error)
+
+	// Market operations
+	CreateMarket(ctx context.Context, market *marketsv1.Market) error
+	GetMarket(ctx context.Context, id string) (*marketsv1.Market, error)
+	ResolveMarket(ctx context.Context, venueID, venueSymbol string) (*marketsv1.Market, error)
+	ListMarketsByInstrument(ctx context.Context, instrumentID string) ([]*marketsv1.Market, error)
+	ListMarketsByVenue(ctx context.Context, venueID string) ([]*marketsv1.Market, error)
+
+	// Identifier operations (unified)
+	CreateIdentifier(ctx context.Context, identifier *identifiersv1.Identifier) error
+	GetIdentifier(ctx context.Context, id string) (*identifiersv1.Identifier, error)
+	ResolveIdentifierByExternalID(ctx context.Context, source, externalID string) (*identifiersv1.Identifier, error)
+	ListIdentifiersByEntity(ctx context.Context, entityType, entityID string) ([]*identifiersv1.Identifier, error)
+	ListIdentifiersBySource(ctx context.Context, source string) ([]*identifiersv1.Identifier, error)
 
 	// Chain operations
 	CreateChain(ctx context.Context, chain *assetsv1.Chain) error
@@ -72,18 +92,6 @@ type Repository interface {
 	CreateVenueAsset(ctx context.Context, venueAsset *venuesv1.VenueAsset) error
 	GetVenueAsset(ctx context.Context, venueID, assetID string) (*venuesv1.VenueAsset, error)
 	ListVenueAssets(ctx context.Context, filter *VenueAssetFilter) ([]*venuesv1.VenueAsset, error)
-
-	// VenueSymbol operations
-	CreateVenueSymbol(ctx context.Context, venueSymbol *venuesv1.VenueSymbol) error
-	GetVenueSymbol(ctx context.Context, venueID, venueSymbol string) (*venuesv1.VenueSymbol, error)
-	GetVenueSymbolByID(ctx context.Context, venueID, symbolID string) (*venuesv1.VenueSymbol, error)
-	ListVenueSymbols(ctx context.Context, filter *VenueSymbolFilter) ([]*venuesv1.VenueSymbol, error)
-	GetVenueSymbolEnriched(ctx context.Context, venueID, venueSymbol string) (*venuesv1.VenueSymbol, *marketsv1.Symbol, error)
-
-	// AssetIdentifier operations
-	CreateAssetIdentifier(ctx context.Context, identifier *assetsv1.AssetIdentifier) error
-	GetAssetIdentifier(ctx context.Context, id string) (*assetsv1.AssetIdentifier, error)
-	ListAssetIdentifiers(ctx context.Context, filter *AssetIdentifierFilter) ([]*assetsv1.AssetIdentifier, error)
 
 	// Transaction support
 	WithTransaction(ctx context.Context, fn func(repo Repository) error) error

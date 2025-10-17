@@ -7,7 +7,6 @@ import (
 	"github.com/Combine-Capital/cqar/internal/manager"
 	"github.com/Combine-Capital/cqar/internal/repository"
 	assetsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/assets/v1"
-	marketsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/markets/v1"
 	servicesv1 "github.com/Combine-Capital/cqc/gen/go/cqc/services/v1"
 	venuesv1 "github.com/Combine-Capital/cqc/gen/go/cqc/venues/v1"
 	"google.golang.org/grpc/codes"
@@ -19,27 +18,30 @@ import (
 // manager dependencies for business logic delegation.
 type AssetRegistryServer struct {
 	servicesv1.UnimplementedAssetRegistryServer
-	assetManager   *manager.AssetManager
-	symbolManager  *manager.SymbolManager
-	venueManager   *manager.VenueManager
-	qualityManager *manager.QualityManager
-	repo           repository.Repository
+	assetManager      *manager.AssetManager
+	instrumentManager *manager.InstrumentManager
+	marketManager     *manager.MarketManager
+	venueManager      *manager.VenueManager
+	qualityManager    *manager.QualityManager
+	repo              repository.Repository
 }
 
 // NewAssetRegistryServer creates a new AssetRegistryServer with the given dependencies.
 func NewAssetRegistryServer(
 	assetManager *manager.AssetManager,
-	symbolManager *manager.SymbolManager,
+	instrumentManager *manager.InstrumentManager,
+	marketManager *manager.MarketManager,
 	venueManager *manager.VenueManager,
 	qualityManager *manager.QualityManager,
 	repo repository.Repository,
 ) *AssetRegistryServer {
 	return &AssetRegistryServer{
-		assetManager:   assetManager,
-		symbolManager:  symbolManager,
-		venueManager:   venueManager,
-		qualityManager: qualityManager,
-		repo:           repo,
+		assetManager:      assetManager,
+		instrumentManager: instrumentManager,
+		marketManager:     marketManager,
+		venueManager:      venueManager,
+		qualityManager:    qualityManager,
+		repo:              repo,
 	}
 }
 
@@ -631,189 +633,6 @@ func (s *AssetRegistryServer) ListChains(ctx context.Context, req *servicesv1.Li
 	return &servicesv1.ListChainsResponse{Chains: chains}, nil
 }
 
-// Symbol Methods (Commit 9c)
-
-// CreateSymbol creates a new trading symbol/market.
-// Symbols represent trading pairs (e.g., BTC/USDT) with market specifications.
-func (s *AssetRegistryServer) CreateSymbol(ctx context.Context, req *servicesv1.CreateSymbolRequest) (*servicesv1.CreateSymbolResponse, error) {
-	// Validate required fields
-	if req.Symbol == nil || *req.Symbol == "" {
-		return nil, status.Error(codes.InvalidArgument, "symbol is required")
-	}
-	if req.BaseAssetId == nil || *req.BaseAssetId == "" {
-		return nil, status.Error(codes.InvalidArgument, "base_asset_id is required")
-	}
-	if req.QuoteAssetId == nil || *req.QuoteAssetId == "" {
-		return nil, status.Error(codes.InvalidArgument, "quote_asset_id is required")
-	}
-
-	// Construct Symbol domain object
-	symbol := &marketsv1.Symbol{
-		Symbol:            req.Symbol,
-		SymbolType:        req.SymbolType,
-		BaseAssetId:       req.BaseAssetId,
-		QuoteAssetId:      req.QuoteAssetId,
-		SettlementAssetId: req.SettlementAssetId,
-		TickSize:          req.TickSize,
-		LotSize:           req.LotSize,
-	}
-
-	// Manager validates and creates symbol
-	if err := s.symbolManager.CreateSymbol(ctx, symbol); err != nil {
-		return nil, err // Manager already wrapped error
-	}
-
-	return &servicesv1.CreateSymbolResponse{Symbol: symbol}, nil
-}
-
-// GetSymbol retrieves a specific symbol by ID.
-func (s *AssetRegistryServer) GetSymbol(ctx context.Context, req *servicesv1.GetSymbolRequest) (*servicesv1.GetSymbolResponse, error) {
-	// Validate required fields
-	if req.SymbolId == nil || *req.SymbolId == "" {
-		return nil, status.Error(codes.InvalidArgument, "symbol_id is required")
-	}
-
-	// Manager handles retrieval and error wrapping
-	symbol, err := s.symbolManager.GetSymbol(ctx, *req.SymbolId)
-	if err != nil {
-		return nil, err // Manager already wrapped error
-	}
-
-	return &servicesv1.GetSymbolResponse{Symbol: symbol}, nil
-}
-
-// UpdateSymbol updates an existing symbol's metadata.
-func (s *AssetRegistryServer) UpdateSymbol(ctx context.Context, req *servicesv1.UpdateSymbolRequest) (*servicesv1.UpdateSymbolResponse, error) {
-	// Validate required fields
-	if req.SymbolId == nil || *req.SymbolId == "" {
-		return nil, status.Error(codes.InvalidArgument, "symbol_id is required")
-	}
-
-	// Construct symbol from request fields
-	// SymbolId is required, other fields are optional for partial updates
-	symbol := &marketsv1.Symbol{
-		SymbolId:   req.SymbolId,
-		Symbol:     req.Symbol,
-		SymbolType: req.SymbolType,
-		TickSize:   req.TickSize,
-		LotSize:    req.LotSize,
-		IsActive:   req.IsActive,
-	}
-
-	// Manager validates and updates
-	if err := s.symbolManager.UpdateSymbol(ctx, symbol); err != nil {
-		return nil, err // Manager already wrapped error
-	}
-
-	return &servicesv1.UpdateSymbolResponse{Symbol: symbol}, nil
-}
-
-// DeleteSymbol soft-deletes a symbol by ID.
-func (s *AssetRegistryServer) DeleteSymbol(ctx context.Context, req *servicesv1.DeleteSymbolRequest) (*servicesv1.DeleteSymbolResponse, error) {
-	// Validate required fields
-	if req.SymbolId == nil || *req.SymbolId == "" {
-		return nil, status.Error(codes.InvalidArgument, "symbol_id is required")
-	}
-
-	// Manager handles deletion and error wrapping
-	if err := s.symbolManager.DeleteSymbol(ctx, *req.SymbolId); err != nil {
-		return nil, err // Manager already wrapped error
-	}
-
-	return &servicesv1.DeleteSymbolResponse{Success: ptrBool(true)}, nil
-}
-
-// ListSymbols retrieves a paginated list of symbols with optional filtering.
-func (s *AssetRegistryServer) ListSymbols(ctx context.Context, req *servicesv1.ListSymbolsRequest) (*servicesv1.ListSymbolsResponse, error) {
-	// Build filter from request parameters
-	filter := &repository.SymbolFilter{}
-
-	// Handle pagination
-	if req.PageSize != nil && *req.PageSize > 0 {
-		filter.Limit = int(*req.PageSize)
-	} else {
-		filter.Limit = 50 // default page size
-	}
-
-	// Parse page token as offset
-	if req.PageToken != nil && *req.PageToken != "" {
-		if offset, err := strconv.Atoi(*req.PageToken); err == nil {
-			filter.Offset = offset
-		}
-	}
-
-	// Apply optional filters
-	if req.SymbolType != nil {
-		typeStr := req.SymbolType.String()
-		filter.SymbolType = &typeStr
-	}
-	if req.BaseAssetId != nil && *req.BaseAssetId != "" {
-		filter.BaseAssetID = req.BaseAssetId
-	}
-	if req.QuoteAssetId != nil && *req.QuoteAssetId != "" {
-		filter.QuoteAssetID = req.QuoteAssetId
-	}
-
-	// Retrieve symbols from manager
-	symbols, err := s.symbolManager.ListSymbols(ctx, filter)
-	if err != nil {
-		return nil, err // Manager already wrapped error
-	}
-
-	// Calculate next page token if there might be more results
-	var nextPageToken *string
-	if len(symbols) == filter.Limit {
-		// More results likely exist
-		nextOffset := filter.Offset + filter.Limit
-		token := strconv.Itoa(nextOffset)
-		nextPageToken = &token
-	}
-
-	return &servicesv1.ListSymbolsResponse{
-		Symbols:       symbols,
-		NextPageToken: nextPageToken,
-	}, nil
-}
-
-// SearchSymbols searches for symbols by query string.
-func (s *AssetRegistryServer) SearchSymbols(ctx context.Context, req *servicesv1.SearchSymbolsRequest) (*servicesv1.SearchSymbolsResponse, error) {
-	// Validate required fields
-	if req.Query == nil || *req.Query == "" {
-		return nil, status.Error(codes.InvalidArgument, "query is required")
-	}
-
-	// Build filter - use default limit
-	filter := &repository.SymbolFilter{
-		Limit: 50, // default limit for search
-	}
-
-	// Manager handles search with validation and error wrapping
-	symbols, err := s.symbolManager.SearchSymbols(ctx, *req.Query, filter)
-	if err != nil {
-		return nil, err // Manager already wrapped error
-	}
-
-	return &servicesv1.SearchSymbolsResponse{Symbols: symbols}, nil
-}
-
-// CreateSymbolIdentifier adds an external identifier mapping for a symbol.
-// Currently unimplemented - placeholder for future integration.
-func (s *AssetRegistryServer) CreateSymbolIdentifier(ctx context.Context, req *servicesv1.CreateSymbolIdentifierRequest) (*servicesv1.CreateSymbolIdentifierResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "CreateSymbolIdentifier not yet implemented")
-}
-
-// GetSymbolIdentifier retrieves a symbol identifier mapping.
-// Currently unimplemented - placeholder for future integration.
-func (s *AssetRegistryServer) GetSymbolIdentifier(ctx context.Context, req *servicesv1.GetSymbolIdentifierRequest) (*servicesv1.GetSymbolIdentifierResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "GetSymbolIdentifier not yet implemented")
-}
-
-// ListSymbolIdentifiers lists all identifier mappings for a symbol.
-// Currently unimplemented - placeholder for future integration.
-func (s *AssetRegistryServer) ListSymbolIdentifiers(ctx context.Context, req *servicesv1.ListSymbolIdentifiersRequest) (*servicesv1.ListSymbolIdentifiersResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "ListSymbolIdentifiers not yet implemented")
-}
-
 // Asset Identifier Methods (Commit 9c - Stubs)
 
 // CreateAssetIdentifier adds an external identifier mapping for an asset.
@@ -983,81 +802,140 @@ func (s *AssetRegistryServer) ListVenueAssets(ctx context.Context, req *services
 	return &servicesv1.ListVenueAssetsResponse{VenueAssets: venueAssets}, nil
 }
 
-// CreateVenueSymbol maps a venue's trading symbol to a canonical symbol.
-// Example: Binance "BTCUSDT" → canonical BTC/USDT spot symbol
-func (s *AssetRegistryServer) CreateVenueSymbol(ctx context.Context, req *servicesv1.CreateVenueSymbolRequest) (*servicesv1.CreateVenueSymbolResponse, error) {
-	// Validate required fields
-	if req.VenueId == nil || *req.VenueId == "" {
-		return nil, status.Error(codes.InvalidArgument, "venue_id is required")
-	}
-	if req.SymbolId == nil || *req.SymbolId == "" {
-		return nil, status.Error(codes.InvalidArgument, "symbol_id is required")
-	}
-	if req.VenueSymbol == nil || *req.VenueSymbol == "" {
-		return nil, status.Error(codes.InvalidArgument, "venue_symbol is required")
+// Instrument Methods
+
+// GetInstrument retrieves an instrument by ID.
+func (s *AssetRegistryServer) GetInstrument(ctx context.Context, req *servicesv1.GetInstrumentRequest) (*servicesv1.GetInstrumentResponse, error) {
+	if req.InstrumentId == nil || *req.InstrumentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "instrument_id is required")
 	}
 
-	// Construct VenueSymbol domain object
-	venueSymbol := &venuesv1.VenueSymbol{
-		VenueId:     req.VenueId,
-		SymbolId:    req.SymbolId,
-		VenueSymbol: req.VenueSymbol,
-		MakerFee:    req.MakerFee,
-		TakerFee:    req.TakerFee,
-	}
-
-	// Manager validates and creates venue symbol mapping
-	if err := s.venueManager.CreateVenueSymbol(ctx, venueSymbol); err != nil {
-		return nil, err // Manager already wrapped error
-	}
-
-	return &servicesv1.CreateVenueSymbolResponse{VenueSymbol: venueSymbol}, nil
-}
-
-// GetVenueSymbol retrieves a venue symbol mapping.
-// Primary use case: cqmd needs to resolve "BTCUSDT" on Binance to canonical symbol.
-func (s *AssetRegistryServer) GetVenueSymbol(ctx context.Context, req *servicesv1.GetVenueSymbolRequest) (*servicesv1.GetVenueSymbolResponse, error) {
-	// Validate required fields
-	if req.VenueId == nil || *req.VenueId == "" {
-		return nil, status.Error(codes.InvalidArgument, "venue_id is required")
-	}
-	if req.VenueSymbol == nil || *req.VenueSymbol == "" {
-		return nil, status.Error(codes.InvalidArgument, "venue_symbol is required")
-	}
-
-	// Manager handles retrieval with enriched symbol data
-	// Note: Manager returns both VenueSymbol and canonical Symbol, but response only includes VenueSymbol
-	venueSymbol, _, err := s.venueManager.GetVenueSymbol(ctx, *req.VenueId, *req.VenueSymbol)
+	instrument, err := s.instrumentManager.GetInstrument(ctx, *req.InstrumentId)
 	if err != nil {
 		return nil, err // Manager already wrapped error
 	}
 
-	return &servicesv1.GetVenueSymbolResponse{
-		VenueSymbol: venueSymbol,
+	return &servicesv1.GetInstrumentResponse{Instrument: instrument}, nil
+}
+
+// GetSpotInstrument retrieves a spot instrument by ID.
+func (s *AssetRegistryServer) GetSpotInstrument(ctx context.Context, req *servicesv1.GetSpotInstrumentRequest) (*servicesv1.GetSpotInstrumentResponse, error) {
+	if req.InstrumentId == nil || *req.InstrumentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "instrument_id is required")
+	}
+
+	spotInstrument, err := s.instrumentManager.GetSpotInstrument(ctx, *req.InstrumentId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &servicesv1.GetSpotInstrumentResponse{SpotInstrument: spotInstrument}, nil
+}
+
+// GetPerpContract retrieves a perpetual contract by ID.
+func (s *AssetRegistryServer) GetPerpContract(ctx context.Context, req *servicesv1.GetPerpContractRequest) (*servicesv1.GetPerpContractResponse, error) {
+	if req.InstrumentId == nil || *req.InstrumentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "instrument_id is required")
+	}
+
+	perpContract, err := s.instrumentManager.GetPerpContract(ctx, *req.InstrumentId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &servicesv1.GetPerpContractResponse{PerpContract: perpContract}, nil
+}
+
+// GetFutureContract retrieves a futures contract by ID.
+func (s *AssetRegistryServer) GetFutureContract(ctx context.Context, req *servicesv1.GetFutureContractRequest) (*servicesv1.GetFutureContractResponse, error) {
+	if req.InstrumentId == nil || *req.InstrumentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "instrument_id is required")
+	}
+
+	futureContract, err := s.instrumentManager.GetFutureContract(ctx, *req.InstrumentId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &servicesv1.GetFutureContractResponse{FutureContract: futureContract}, nil
+}
+
+// GetOptionSeries retrieves an option series by ID.
+func (s *AssetRegistryServer) GetOptionSeries(ctx context.Context, req *servicesv1.GetOptionSeriesRequest) (*servicesv1.GetOptionSeriesResponse, error) {
+	if req.InstrumentId == nil || *req.InstrumentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "instrument_id is required")
+	}
+
+	optionSeries, err := s.instrumentManager.GetOptionSeries(ctx, *req.InstrumentId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &servicesv1.GetOptionSeriesResponse{OptionSeries: optionSeries}, nil
+}
+
+// GetLendingDeposit retrieves a lending deposit product by ID.
+func (s *AssetRegistryServer) GetLendingDeposit(ctx context.Context, req *servicesv1.GetLendingDepositRequest) (*servicesv1.GetLendingDepositResponse, error) {
+	if req.InstrumentId == nil || *req.InstrumentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "instrument_id is required")
+	}
+
+	lendingDeposit, err := s.instrumentManager.GetLendingDeposit(ctx, *req.InstrumentId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &servicesv1.GetLendingDepositResponse{LendingDeposit: lendingDeposit}, nil
+}
+
+// GetLendingBorrow retrieves a lending borrow product by ID.
+func (s *AssetRegistryServer) GetLendingBorrow(ctx context.Context, req *servicesv1.GetLendingBorrowRequest) (*servicesv1.GetLendingBorrowResponse, error) {
+	if req.InstrumentId == nil || *req.InstrumentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "instrument_id is required")
+	}
+
+	lendingBorrow, err := s.instrumentManager.GetLendingBorrow(ctx, *req.InstrumentId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &servicesv1.GetLendingBorrowResponse{LendingBorrow: lendingBorrow}, nil
+}
+
+// Market Methods
+
+// GetMarket retrieves a market by ID.
+func (s *AssetRegistryServer) GetMarket(ctx context.Context, req *servicesv1.GetMarketRequest) (*servicesv1.GetMarketResponse, error) {
+	if req.MarketId == nil || *req.MarketId == "" {
+		return nil, status.Error(codes.InvalidArgument, "market_id is required")
+	}
+
+	market, err := s.marketManager.GetMarket(ctx, *req.MarketId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &servicesv1.GetMarketResponse{Market: market}, nil
+}
+
+// ResolveMarket resolves a market by venue_id and venue_symbol.
+// This is the critical resolver for converting venue-specific symbols to market_id and instrument_id.
+func (s *AssetRegistryServer) ResolveMarket(ctx context.Context, req *servicesv1.ResolveMarketRequest) (*servicesv1.ResolveMarketResponse, error) {
+	if req.VenueId == nil || *req.VenueId == "" {
+		return nil, status.Error(codes.InvalidArgument, "venue_id is required")
+	}
+	if req.VenueSymbol == nil || *req.VenueSymbol == "" {
+		return nil, status.Error(codes.InvalidArgument, "venue_symbol is required")
+	}
+
+	market, err := s.marketManager.ResolveMarket(ctx, *req.VenueId, *req.VenueSymbol)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return just the market_id and instrument_id as per CQC contract
+	return &servicesv1.ResolveMarketResponse{
+		MarketId:     market.Id,
+		InstrumentId: market.InstrumentId,
 	}, nil
-}
-
-// ListVenueSymbols lists all symbol mappings for a venue or symbol.
-// Supports queries like "all symbols on Binance" or "all venues trading BTC/USDT"
-func (s *AssetRegistryServer) ListVenueSymbols(ctx context.Context, req *servicesv1.ListVenueSymbolsRequest) (*servicesv1.ListVenueSymbolsResponse, error) {
-	// Build filter from request
-	filter := &repository.VenueSymbolFilter{
-		Limit: 100, // default limit
-	}
-
-	// Filter by venue_id OR symbol_id (or both)
-	if req.VenueId != nil && *req.VenueId != "" {
-		filter.VenueID = req.VenueId
-	}
-	if req.SymbolId != nil && *req.SymbolId != "" {
-		filter.SymbolID = req.SymbolId
-	}
-
-	// Manager handles listing and error wrapping
-	venueSymbols, err := s.venueManager.ListVenueSymbols(ctx, filter)
-	if err != nil {
-		return nil, err // Manager already wrapped error
-	}
-
-	return &servicesv1.ListVenueSymbolsResponse{VenueSymbols: venueSymbols}, nil
 }

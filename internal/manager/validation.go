@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	assetsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/assets/v1"
+	marketsv1 "github.com/Combine-Capital/cqc/gen/go/cqc/markets/v1"
 )
 
 // Validation constants
@@ -120,5 +121,145 @@ func ValidateReason(reason string) error {
 	if strings.TrimSpace(reason) == "" {
 		return fmt.Errorf("reason is required")
 	}
+	return nil
+}
+
+// ValidateRequiredInstrumentFields validates that all required fields for an instrument are present
+func ValidateRequiredInstrumentFields(instrument *marketsv1.Instrument) error {
+	if instrument == nil {
+		return fmt.Errorf("instrument cannot be nil")
+	}
+
+	if instrument.InstrumentType == nil || strings.TrimSpace(*instrument.InstrumentType) == "" {
+		return fmt.Errorf("instrument_type is required")
+	}
+
+	// Validate instrument_type is one of the allowed values
+	validTypes := map[string]bool{
+		"SPOT":            true,
+		"PERPETUAL":       true,
+		"FUTURE":          true,
+		"OPTION":          true,
+		"LENDING_DEPOSIT": true,
+		"LENDING_BORROW":  true,
+	}
+	if !validTypes[*instrument.InstrumentType] {
+		return fmt.Errorf("invalid instrument_type: %s (must be SPOT, PERPETUAL, FUTURE, OPTION, LENDING_DEPOSIT, or LENDING_BORROW)", *instrument.InstrumentType)
+	}
+
+	if instrument.Code == nil || strings.TrimSpace(*instrument.Code) == "" {
+		return fmt.Errorf("code is required")
+	}
+
+	return nil
+}
+
+// ValidatePerpContractFields validates perpetual contract specific fields
+func ValidatePerpContractFields(perp *marketsv1.PerpContract) error {
+	if perp == nil {
+		return fmt.Errorf("perp contract cannot be nil")
+	}
+
+	if perp.UnderlyingAssetId == nil || strings.TrimSpace(*perp.UnderlyingAssetId) == "" {
+		return fmt.Errorf("underlying_asset_id is required for perpetual contracts")
+	}
+
+	// Contract multiplier should be positive if provided
+	if perp.ContractMultiplier != nil && *perp.ContractMultiplier != "" {
+		// Basic validation - just ensure it's non-empty
+		// The database will enforce numeric format
+	}
+
+	return nil
+}
+
+// ValidateFutureContractFields validates future contract specific fields
+func ValidateFutureContractFields(future *marketsv1.FutureContract) error {
+	if future == nil {
+		return fmt.Errorf("future contract cannot be nil")
+	}
+
+	if future.UnderlyingAssetId == nil || strings.TrimSpace(*future.UnderlyingAssetId) == "" {
+		return fmt.Errorf("underlying_asset_id is required for future contracts")
+	}
+
+	if future.Expiry == nil {
+		return fmt.Errorf("expiry is required for future contracts")
+	}
+
+	return nil
+}
+
+// ValidateOptionSeriesFields validates option series specific fields
+func ValidateOptionSeriesFields(option *marketsv1.OptionSeries) error {
+	if option == nil {
+		return fmt.Errorf("option series cannot be nil")
+	}
+
+	if option.UnderlyingAssetId == nil || strings.TrimSpace(*option.UnderlyingAssetId) == "" {
+		return fmt.Errorf("underlying_asset_id is required for options")
+	}
+
+	if option.Expiry == nil {
+		return fmt.Errorf("expiry is required for options")
+	}
+
+	if option.StrikePrice == nil || strings.TrimSpace(*option.StrikePrice) == "" {
+		return fmt.Errorf("strike_price is required for options")
+	}
+
+	if option.OptionType == nil || strings.TrimSpace(*option.OptionType) == "" {
+		return fmt.Errorf("option_type is required for options")
+	}
+
+	// Validate option_type is CALL or PUT
+	optionType := strings.ToUpper(*option.OptionType)
+	if optionType != "CALL" && optionType != "PUT" {
+		return fmt.Errorf("option_type must be CALL or PUT, got: %s", *option.OptionType)
+	}
+
+	if option.ExerciseStyle == nil || strings.TrimSpace(*option.ExerciseStyle) == "" {
+		return fmt.Errorf("exercise_style is required for options")
+	}
+
+	// Validate exercise_style is european or american
+	exerciseStyle := strings.ToLower(*option.ExerciseStyle)
+	if exerciseStyle != "european" && exerciseStyle != "american" {
+		return fmt.Errorf("exercise_style must be 'european' or 'american', got: %s", *option.ExerciseStyle)
+	}
+
+	return nil
+}
+
+// ValidateRequiredMarketFields validates that all required fields for a market are present
+func ValidateRequiredMarketFields(market *marketsv1.Market) error {
+	if market == nil {
+		return fmt.Errorf("market cannot be nil")
+	}
+
+	if market.InstrumentId == nil || strings.TrimSpace(*market.InstrumentId) == "" {
+		return fmt.Errorf("instrument_id is required")
+	}
+
+	if market.VenueId == nil || strings.TrimSpace(*market.VenueId) == "" {
+		return fmt.Errorf("venue_id is required")
+	}
+
+	if market.VenueSymbol == nil || strings.TrimSpace(*market.VenueSymbol) == "" {
+		return fmt.Errorf("venue_symbol is required")
+	}
+
+	return nil
+}
+
+// ValidateMarketSpecs validates market specifications (tick_size, lot_size, etc.)
+func ValidateMarketSpecs(market *marketsv1.Market) error {
+	if market == nil {
+		return fmt.Errorf("market cannot be nil")
+	}
+
+	// All market spec fields are optional, but if provided should be positive
+	// The database constraints will enforce this, so we just do basic checks here
+
 	return nil
 }

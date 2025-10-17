@@ -78,12 +78,12 @@ func (s *Service) Start(ctx context.Context) error {
 	// Wrap repository with cache layer
 	cacheTTLs := repository.CacheTTLs{
 		Asset:       s.cfg.CacheTTL.Asset,
-		Symbol:      s.cfg.CacheTTL.Symbol,
 		Venue:       s.cfg.CacheTTL.Venue,
 		VenueAsset:  s.cfg.CacheTTL.VenueAsset,
-		VenueSymbol: s.cfg.CacheTTL.VenueSymbol,
 		QualityFlag: s.cfg.CacheTTL.QualityFlag,
-		Chain:       s.cfg.CacheTTL.Asset, // Use same TTL as assets for chains
+		Chain:       s.cfg.CacheTTL.Asset,      // Use same TTL as assets for chains
+		Instrument:  s.cfg.CacheTTL.Asset,      // Use same TTL as assets for instruments
+		Market:      s.cfg.CacheTTL.VenueAsset, // Use same TTL as venue assets for markets
 	}
 	repo := repository.NewCachedRepository(baseRepo, s.cache, cacheTTLs)
 
@@ -91,15 +91,22 @@ func (s *Service) Start(ctx context.Context) error {
 	eventPublisher := manager.NewEventPublisher(s.eventBus, s.logger)
 
 	// Initialize managers with event publisher
+	// Order matters due to dependencies:
+	// 1. QualityManager and AssetManager (no dependencies on other managers)
+	// 2. VenueManager (depends on AssetManager)
+	// 3. InstrumentManager (depends on AssetManager)
+	// 4. MarketManager (depends on InstrumentManager, VenueManager, AssetManager)
 	qualityMgr := manager.NewQualityManager(repo, eventPublisher)
 	assetMgr := manager.NewAssetManager(repo, qualityMgr, eventPublisher)
-	symbolMgr := manager.NewSymbolManager(repo, assetMgr, eventPublisher)
-	venueMgr := manager.NewVenueManager(repo, assetMgr, symbolMgr, eventPublisher)
+	venueMgr := manager.NewVenueManager(repo, assetMgr, eventPublisher)
+	instrumentMgr := manager.NewInstrumentManager(repo, assetMgr, eventPublisher)
+	marketMgr := manager.NewMarketManager(repo, instrumentMgr, venueMgr, assetMgr, eventPublisher)
 
 	// Create gRPC server with AssetRegistry implementation
 	assetRegistryServer := server.NewAssetRegistryServer(
 		assetMgr,
-		symbolMgr,
+		instrumentMgr,
+		marketMgr,
 		venueMgr,
 		qualityMgr,
 		repo,

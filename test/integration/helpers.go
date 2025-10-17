@@ -33,23 +33,24 @@ const (
 
 // TestFixture holds all components needed for integration testing
 type TestFixture struct {
-	DB             *sql.DB
-	DBPool         *database.Pool
-	Cache          cache.Cache
-	EventBus       bus.EventBus
-	Repository     repository.Repository
-	AssetManager   *manager.AssetManager
-	SymbolManager  *manager.SymbolManager
-	VenueManager   *manager.VenueManager
-	QualityManager *manager.QualityManager
-	EventPublisher *manager.EventPublisher
-	Server         servicesv1.AssetRegistryClient
-	GRPCServer     *grpc.Server
-	Listener       *bufconn.Listener
-	Logger         *logging.Logger
-	Config         *config.Config
-	Ctx            context.Context
-	Cancel         context.CancelFunc
+	DB                *sql.DB
+	DBPool            *database.Pool
+	Cache             cache.Cache
+	EventBus          bus.EventBus
+	Repository        repository.Repository
+	AssetManager      *manager.AssetManager
+	InstrumentManager *manager.InstrumentManager
+	MarketManager     *manager.MarketManager
+	VenueManager      *manager.VenueManager
+	QualityManager    *manager.QualityManager
+	EventPublisher    *manager.EventPublisher
+	Server            servicesv1.AssetRegistryClient
+	GRPCServer        *grpc.Server
+	Listener          *bufconn.Listener
+	Logger            *logging.Logger
+	Config            *config.Config
+	Ctx               context.Context
+	Cancel            context.CancelFunc
 }
 
 // NewTestFixture creates a new test fixture with all dependencies initialized
@@ -79,28 +80,34 @@ func NewTestFixture(t *testing.T) *TestFixture {
 	baseRepo := repository.NewPostgresRepository(dbPool)
 	cacheTTLs := repository.CacheTTLs{
 		Asset:       cfg.CacheTTL.Asset,
-		Symbol:      cfg.CacheTTL.Symbol,
 		Venue:       cfg.CacheTTL.Venue,
 		VenueAsset:  cfg.CacheTTL.VenueAsset,
-		VenueSymbol: cfg.CacheTTL.VenueSymbol,
 		QualityFlag: cfg.CacheTTL.QualityFlag,
 		Chain:       cfg.CacheTTL.Asset,
+		Instrument:  cfg.CacheTTL.Asset,      // Use same TTL as assets for instruments
+		Market:      cfg.CacheTTL.VenueAsset, // Use same TTL as venue assets for markets
 	}
 	repo := repository.NewCachedRepository(baseRepo, cacheClient, cacheTTLs)
 
-	// Initialize managers
+	// Initialize managers with correct dependency order
+	// 1. QualityManager and AssetManager (no dependencies on other managers)
+	// 2. VenueManager (depends on AssetManager)
+	// 3. InstrumentManager (depends on AssetManager)
+	// 4. MarketManager (depends on InstrumentManager, VenueManager, AssetManager)
 	eventPublisher := manager.NewEventPublisher(eventBus, logger)
 	qualityMgr := manager.NewQualityManager(repo, eventPublisher)
 	assetMgr := manager.NewAssetManager(repo, qualityMgr, eventPublisher)
-	symbolMgr := manager.NewSymbolManager(repo, assetMgr, eventPublisher)
-	venueMgr := manager.NewVenueManager(repo, assetMgr, symbolMgr, eventPublisher)
+	venueMgr := manager.NewVenueManager(repo, assetMgr, eventPublisher)
+	instrumentMgr := manager.NewInstrumentManager(repo, assetMgr, eventPublisher)
+	marketMgr := manager.NewMarketManager(repo, instrumentMgr, venueMgr, assetMgr, eventPublisher)
 
 	// Initialize gRPC server (in-memory)
 	listener := bufconn.Listen(bufSize)
 	grpcServer := grpc.NewServer()
 	assetRegistryServer := server.NewAssetRegistryServer(
 		assetMgr,
-		symbolMgr,
+		instrumentMgr,
+		marketMgr,
 		venueMgr,
 		qualityMgr,
 		repo,
@@ -126,23 +133,24 @@ func NewTestFixture(t *testing.T) *TestFixture {
 	client := servicesv1.NewAssetRegistryClient(conn)
 
 	return &TestFixture{
-		DB:             db,
-		DBPool:         dbPool,
-		Cache:          cacheClient,
-		EventBus:       eventBus,
-		Repository:     repo,
-		AssetManager:   assetMgr,
-		SymbolManager:  symbolMgr,
-		VenueManager:   venueMgr,
-		QualityManager: qualityMgr,
-		EventPublisher: eventPublisher,
-		Server:         client,
-		GRPCServer:     grpcServer,
-		Listener:       listener,
-		Logger:         logger,
-		Config:         cfg,
-		Ctx:            ctx,
-		Cancel:         cancel,
+		DB:                db,
+		DBPool:            dbPool,
+		Cache:             cacheClient,
+		EventBus:          eventBus,
+		Repository:        repo,
+		AssetManager:      assetMgr,
+		InstrumentManager: instrumentMgr,
+		MarketManager:     marketMgr,
+		VenueManager:      venueMgr,
+		QualityManager:    qualityMgr,
+		EventPublisher:    eventPublisher,
+		Server:            client,
+		GRPCServer:        grpcServer,
+		Listener:          listener,
+		Logger:            logger,
+		Config:            cfg,
+		Ctx:               ctx,
+		Cancel:            cancel,
 	}
 }
 
@@ -182,16 +190,21 @@ func (f *TestFixture) ResetDatabase(t *testing.T) {
 
 	// Truncate all tables in reverse dependency order
 	tables := []string{
-		"venue_symbols",
+		"identifiers", // New unified identifiers table
+		"markets",     // New markets table (replaces venue_symbols)
 		"venue_assets",
-		"symbol_identifiers",
-		"asset_identifiers",
+		"lending_borrows",  // New lending borrow instruments
+		"lending_deposits", // New lending deposit instruments
+		"option_series",    // New option instruments
+		"future_contracts", // New future instruments
+		"perp_contracts",   // New perpetual instruments
+		"spot_instruments", // New spot instruments
+		"instruments",      // New instruments table (replaces symbols)
 		"group_members",
 		"asset_groups",
 		"quality_flags",
 		"relationships",
 		"deployments",
-		"symbols",
 		"venues",
 		"chains",
 		"assets",
@@ -211,7 +224,8 @@ func (f *TestFixture) LoadSeedData(t *testing.T, files ...string) {
 	defer cancel()
 
 	for _, file := range files {
-		path := filepath.Join("testdata", file)
+		// Path is relative to the test/integration directory
+		path := filepath.Join("..", "testdata", file)
 		data, err := os.ReadFile(path)
 		require.NoError(t, err, "Failed to read seed file %s", file)
 

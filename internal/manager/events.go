@@ -144,43 +144,6 @@ func (p *EventPublisher) PublishRelationshipEstablished(ctx context.Context, rel
 	}()
 }
 
-// PublishSymbolCreated publishes a SymbolCreated event when a new trading symbol is created.
-// Topic: cqc.events.v1.symbol_created
-func (p *EventPublisher) PublishSymbolCreated(ctx context.Context, symbol *marketsv1.Symbol) {
-	if p.bus == nil {
-		p.logger.Warn().Msg("Event bus not initialized, skipping SymbolCreated event")
-		return
-	}
-
-	eventID := uuid.New().String()
-	actorID := "service:cqar"
-	event := &eventsv1.SymbolCreated{
-		EventId:   &eventID,
-		Timestamp: timestamppb.Now(),
-		ActorId:   &actorID,
-		Symbol:    symbol,
-	}
-
-	go func() {
-		if err := p.bus.Publish(ctx, "cqc.events.v1.symbol_created", event); err != nil {
-			p.logger.Error().
-				Err(err).
-				Str("symbol_id", ptrStr(symbol.SymbolId)).
-				Str("base_asset_id", ptrStr(symbol.BaseAssetId)).
-				Str("quote_asset_id", ptrStr(symbol.QuoteAssetId)).
-				Str("event_id", eventID).
-				Msg("Failed to publish SymbolCreated event")
-		} else {
-			p.logger.Info().
-				Str("symbol_id", ptrStr(symbol.SymbolId)).
-				Str("base_asset_id", ptrStr(symbol.BaseAssetId)).
-				Str("quote_asset_id", ptrStr(symbol.QuoteAssetId)).
-				Str("event_id", eventID).
-				Msg("Published SymbolCreated event")
-		}
-	}()
-}
-
 // PublishVenueAssetListed publishes a VenueAssetListed event when an asset is listed on a venue.
 // Topic: cqc.events.v1.venue_asset_listed
 func (p *EventPublisher) PublishVenueAssetListed(ctx context.Context, venueAsset *venuesv1.VenueAsset) {
@@ -214,45 +177,6 @@ func (p *EventPublisher) PublishVenueAssetListed(ctx context.Context, venueAsset
 				Str("asset_id", ptrStr(venueAsset.AssetId)).
 				Str("event_id", eventID).
 				Msg("Published VenueAssetListed event")
-		}
-	}()
-}
-
-// PublishVenueSymbolListed publishes a VenueSymbolListed event when a trading symbol is listed on a venue.
-// Topic: cqc.events.v1.venue_symbol_listed
-func (p *EventPublisher) PublishVenueSymbolListed(ctx context.Context, venueSymbol *venuesv1.VenueSymbol) {
-	if p.bus == nil {
-		p.logger.Warn().Msg("Event bus not initialized, skipping VenueSymbolListed event")
-		return
-	}
-
-	eventID := uuid.New().String()
-	actorID := "service:cqar"
-	isNewListing := true // All listings through CreateVenueSymbol are new
-	event := &eventsv1.VenueSymbolListed{
-		EventId:      &eventID,
-		Timestamp:    timestamppb.Now(),
-		ActorId:      &actorID,
-		VenueSymbol:  venueSymbol,
-		IsNewListing: &isNewListing,
-	}
-
-	go func() {
-		if err := p.bus.Publish(ctx, "cqc.events.v1.venue_symbol_listed", event); err != nil {
-			p.logger.Error().
-				Err(err).
-				Str("venue_id", ptrStr(venueSymbol.VenueId)).
-				Str("symbol_id", ptrStr(venueSymbol.SymbolId)).
-				Str("venue_symbol", ptrStr(venueSymbol.VenueSymbol)).
-				Str("event_id", eventID).
-				Msg("Failed to publish VenueSymbolListed event")
-		} else {
-			p.logger.Info().
-				Str("venue_id", ptrStr(venueSymbol.VenueId)).
-				Str("symbol_id", ptrStr(venueSymbol.SymbolId)).
-				Str("venue_symbol", ptrStr(venueSymbol.VenueSymbol)).
-				Str("event_id", eventID).
-				Msg("Published VenueSymbolListed event")
 		}
 	}()
 }
@@ -300,4 +224,44 @@ func ptrStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// PublishInstrumentCreated publishes an InstrumentCreated event when a new instrument is created.
+// Topic: cqc.events.v1.instrument_created
+// TODO: Update to use proper protobuf event when added to CQC
+func (p *EventPublisher) PublishInstrumentCreated(ctx context.Context, instrument *marketsv1.Instrument) {
+	if p.bus == nil {
+		p.logger.Warn().Msg("Event bus not initialized, skipping InstrumentCreated event")
+		return
+	}
+
+	eventID := uuid.New().String()
+
+	// Log the event for now until proper protobuf event is added to CQC
+	p.logger.Info().
+		Str("instrument_id", ptrStr(instrument.Id)).
+		Str("instrument_type", ptrStr(instrument.InstrumentType)).
+		Str("code", ptrStr(instrument.Code)).
+		Str("event_id", eventID).
+		Msg("Instrument created (event publishing pending protobuf definition)")
+}
+
+// PublishMarketListed publishes a MarketListed event when a market is listed.
+// Topic: cqc.events.v1.market_listed
+// TODO: Update to use proper protobuf event when added to CQC
+func (p *EventPublisher) PublishMarketListed(ctx context.Context, market *marketsv1.Market) {
+	if p.bus == nil {
+		p.logger.Warn().Msg("Event bus not initialized, skipping MarketListed event")
+		return
+	}
+
+	eventID := uuid.New().String()
+
+	// Log the event for now until proper protobuf event is added to CQC
+	p.logger.Info().
+		Str("market_id", ptrStr(market.Id)).
+		Str("venue_id", ptrStr(market.VenueId)).
+		Str("venue_symbol", ptrStr(market.VenueSymbol)).
+		Str("event_id", eventID).
+		Msg("Market listed (event publishing pending protobuf definition)")
 }
